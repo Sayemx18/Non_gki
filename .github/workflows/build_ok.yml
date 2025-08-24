@@ -9,11 +9,11 @@ on:
         required: false
       KERNEL_TREE_1:
         description: 'Kernel Tree 1'
-        default: 'https://github.com/re-noroi/kernel_sm8250'
+        default: 'https://github.com/Sayemx18/kernel_sm8250'
         required: true
       KERNEL_TREE_BRANCH_1:
         description: 'Kernel Tree Branch 1'
-        default: 'stable'
+        default: 'base'
         required: true
       CODENAME:
         description: 'Phone Codename'
@@ -49,6 +49,11 @@ jobs:
       - name: Checkout Kernel
         run: git clone --depth=1 $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
 
+      - name: Setup SukiSU
+        run: |
+          cd kernel_tree
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
+          
 
       
       - name: Apply Patches
@@ -60,14 +65,12 @@ jobs:
           export PATH="$(pwd)/clang/bin:$PATH"
           export ARCH=arm64
           export SUBARCH=ARM64
-          export KBUILD_BUILD_USER="renoroi"
-          export KBUILD_BUILD_HOST="dreamstate"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           cd kernel_tree
           make O=out vendor/alioth_defconfig
           make O=out CC=clang -j$(nproc --all) CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1
-          mv out/arch/arm64/boot/dtbo.img ../alioth-j3s-dtbo-aosp.img
-          mv out/arch/arm64/boot/dtb.img ../alioth-normal-dtb
+          mv out/arch/arm64/boot/dtbo.img ../dtbo.img
+          mv out/arch/arm64/boot/dtb.img ../dtb
           cp out/arch/arm64/boot/Image.gz ../Image.gz
 
       - name: Upload Kernel Artifacts
