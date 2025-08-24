@@ -1,4 +1,4 @@
-name: KSU-TESTER
+name: N0 test
 
 on:
   pull_request:
