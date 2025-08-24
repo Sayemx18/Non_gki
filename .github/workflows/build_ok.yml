@@ -1,0 +1,112 @@
+name: KSU-TESTER
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      BUILD_TITLE:
+        description: 'Custom Build Title'
+        required: false
+      KERNEL_TREE_1:
+        description: 'Kernel Tree 1'
+        default: 'https://github.com/re-noroi/kernel_sm8250'
+        required: true
+      KERNEL_TREE_BRANCH_1:
+        description: 'Kernel Tree Branch 1'
+        default: 'stable'
+        required: true
+      CODENAME:
+        description: 'Phone Codename'
+        default: 'alioth'
+        required: true
+      ANYKERNEL_URL:
+        description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
+        default: 'https://github.com/Sayemx18/AKalioth'
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      UPLOAD_TO_RELEASE: false
+
+    steps:
+      - name: Install Dependencies
+        run: sudo apt install flex libncurses6
+
+      - name: Download & Extract Clang
+        run: |
+          wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
+          mkdir clang
+          unzstd -d clang.tar.zst
+          tar -xf clang.tar -C clang
+          
+      - name: Set Kernel Environment Variables
+        run: |
+          echo "KERNEL_TREE=${{ github.event.inputs.KERNEL_TREE_1 }}" >> $GITHUB_ENV
+          echo "KERNEL_TREE_BRANCH=${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}" >> $GITHUB_ENV
+          
+      - name: Checkout Kernel
+        run: git clone --depth=1 $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
+
+
+      
+      - name: Apply Patches
+        run: |
+          cd kernel_tree
+      
+      - name: Build Kernel
+        run: |
+          export PATH="$(pwd)/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=ARM64
+          export KBUILD_BUILD_USER="renoroi"
+          export KBUILD_BUILD_HOST="dreamstate"
+          export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
+          cd kernel_tree
+          make O=out vendor/alioth_defconfig
+          make O=out CC=clang -j$(nproc --all) CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1
+          mv out/arch/arm64/boot/dtbo.img ../alioth-j3s-dtbo-aosp.img
+          mv out/arch/arm64/boot/dtb.img ../alioth-normal-dtb
+          cp out/arch/arm64/boot/Image.gz ../Image.gz
+
+      - name: Upload Kernel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-artifacts
+          path: |
+            dtbo.img
+            dtb
+            Image.gz
+
+  package_anykernel:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Kernel Build
+        uses: actions/download-artifact@v4
+        with:
+          name: kernel-artifacts
+          path: kernel-artifacts
+
+      - name: Clone AnyKernel3
+        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main AnyKernel3
+
+      - name: Move Kernel Files to AnyKernel3
+        run: |
+          mv kernel-artifacts/* AnyKernel3/
+
+      - name: Define ZIP Name
+        run: |
+          COMPILED_DATE=$(date +%Y%m%d)
+          echo "ZIP_NAME=[N0-16.4 1-][sukisu-${{ github.event.inputs.CODENAME }}-$COMPILED_DATE]" >> $GITHUB_ENV
+      
+      - name: Upload Flashable Kernel Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: |
+            AnyKernel3/
+            !AnyKernel3/.git
+            !AnyKernel3/.github
