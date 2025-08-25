@@ -68,6 +68,23 @@ jobs:
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           cd kernel_tree
           make O=out vendor/alioth_defconfig
+          SET_CONFIG(){    
+              if [ "$KSU_ENABLE" -eq 1 ]; then
+                  scripts/config --file out/.config -e KSU
+              else
+                  scripts/config --file out/.config -d KSU
+              fi
+
+              # Enable the KSU_MANUAL_HOOK for sukisu-ultra
+              if [ "$KSU_VERSION" == "sukisu-ultra" ];then
+                  scripts/config --file out/.config -e KSU_MANUAL_HOOK
+              else
+                  scripts/config --file out/.config -e KSU_MANUAL_HOOK
+              fi
+          }
+          export KSU_ENABLE=1
+          export KSU_VERSION="sukisu-ultra"
+          SET_CONFIG
           make O=out CC=clang -j$(nproc --all) CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1
           mv out/arch/arm64/boot/dtbo.img ../dtbo.img
           mv out/arch/arm64/boot/dtb.img ../dtb
