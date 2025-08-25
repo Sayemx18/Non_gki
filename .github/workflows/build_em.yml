@@ -1,5 +1,5 @@
 # KSU Kernel Build Workflow
-name: KSU-TESTER
+name: KSU-N0
 
 on:
   pull_request:
