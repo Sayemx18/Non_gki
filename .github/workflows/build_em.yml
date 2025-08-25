@@ -241,24 +241,24 @@ jobs:
           
           # Add your fork as a remote and fetch the base branch with more depth for cherry-picking
           echo "Adding myfork remote and fetching commits..."
-          git remote add myfork https://github.com/Sayemx18/kernel_sm8250
-          git fetch myfork base --depth=10
+          git remote add myfork https://github.com/AlirezaParsi/pocof3
+          git fetch myfork last --depth=10
           
           # Cherry-pick the specific commits
           echo "Cherry-picking commits..."
           
-          echo "Cherry-picking commit 26633161b0395c29c36107cb493837ca3fb62d09..."
-          git cherry-pick 26633161b0395c29c36107cb493837ca3fb62d09 || {
-            echo "Failed to cherry-pick 26633161b0395c29c36107cb493837ca3fb62d09"
+          echo "Cherry-picking commit c392c8c3bcb7e4ecfebb9a38e627321a85e0ae45..."
+          git cherry-pick c392c8c3bcb7e4ecfebb9a38e627321a85e0ae45 || {
+            echo "Failed to cherry-pick c392c8c3bcb7e4ecfebb9a38e627321a85e0ae45"
             echo "Checking cherry-pick status..."
             git status
             git cherry-pick --abort
             exit 1
           }
           
-          echo "Cherry-picking commit 8e96175e7c4acbb21fbf44c7059eb954f9a033fb..."
-          git cherry-pick 8e96175e7c4acbb21fbf44c7059eb954f9a033fb || {
-            echo "Failed to cherry-pick 8e96175e7c4acbb21fbf44c7059eb954f9a033fb"
+          echo "Cherry-picking commit a34bbb74170e92093caefcbf838a379309e68c5d..."
+          git cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d || {
+            echo "Failed to cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d"
             echo "Checking cherry-pick status..."
             git status
             git cherry-pick --abort
