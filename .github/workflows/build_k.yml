@@ -8,14 +8,17 @@ on:
       BUILD_TITLE:
         description: 'Custom Build Title'
         required: false
+        type: string
       KERNEL_TREE_1:
         description: 'Kernel Tree 1'
         default: 'https://github.com/Sayemx18/kernel_sm8250'
         required: true
+        type: string
       KERNEL_TREE_BRANCH_1:
         description: 'Kernel Tree Branch 1'
         default: 'base'
         required: true
+        type: string
       CODENAME:
         description: 'Phone Codename'
         type: choice
@@ -30,6 +33,7 @@ on:
         description: 'Custom Kernel Version (e.g., 16.4.0, 16.4.1)'
         default: '16.4.0'
         required: true
+        type: string
       KSU_VERSION:
         description: 'KernelSU Version'
         type: choice
@@ -55,6 +59,7 @@ on:
         description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
         default: 'https://github.com/Sayemx18/AKalioth'
         required: false
+        type: string
       UPLOAD_TO_TELEGRAM:
         description: 'Upload to Telegram'
         type: choice
@@ -130,13 +135,13 @@ jobs:
             echo "KSU_ENABLE=0" >> $GITHUB_ENV
           fi
           
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kmp" ]]; then
+          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kpm" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
             echo "KPM_ENABLE=1" >> $GITHUB_ENV
           elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
             echo "KPM_ENABLE=0" >> $GITHUB_ENV
-          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "kmp" ]]; then
+          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "kpm" ]]; then
             echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
             echo "KPM_ENABLE=1" >> $GITHUB_ENV
           else
@@ -499,9 +504,9 @@ jobs:
           name: ${{ github.event.inputs.BUILD_TITLE || format('N0Kernel v{0} - Multi-Device Build', github.event.inputs.KERNEL_VERSION) }}
           tag_name: v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
           body: |
-            **🔧 N0Kernel v${{ github.event.inputs.KERNEL_VERSION }} Build**
+            **N0Kernel v${{ github.event.inputs.KERNEL_VERSION }} Build**
             
-            **📋 Build Configuration:**
+            **Build Configuration:**
             - **Device:** ${{ matrix.device }}
             - **Version:** ${{ github.event.inputs.KERNEL_VERSION }}
             - **KernelSU:** ${{ github.event.inputs.KSU_VERSION }}
@@ -509,21 +514,21 @@ jobs:
             - **Kernel Tree:** ${{ github.event.inputs.KERNEL_TREE_1 }}
             - **Branch:** ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
             
-            **📱 Device Support:**
+            **Device Support:**
             - **alioth:** Redmi K40 / POCO F3
             - **apollo:** Xiaomi Mi 10T / Mi 10T Pro
             - **munch:** POCO F4
             
-            **📦 Download:** `${{ env.ZIP_NAME }}.zip`
+            **Download:** `${{ env.ZIP_NAME }}.zip`
             
-            **🚀 Installation:**
+            **Installation:**
             1. Download the ZIP file for your device
             2. Boot into custom recovery (TWRP/OrangeFox)
             3. Flash the kernel ZIP
             4. Reboot and enjoy!
             
             ---
-            *Built with GitHub Actions* ⚡
+            *Built with GitHub Actions*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -551,16 +556,16 @@ jobs:
               ;;
           esac
           
-          CAPTION="🔧 **N0Kernel v${{ github.event.inputs.KERNEL_VERSION }}** 🔧
+          CAPTION="**N0Kernel v${{ github.event.inputs.KERNEL_VERSION }}**
 
-📱 **Device:** ${{ matrix.device }} ($DEVICE_NAME)
-📋 **Version:** ${{ github.event.inputs.KERNEL_VERSION }}
-🔐 **KernelSU:** ${{ github.event.inputs.KSU_VERSION }}
-⚙️ **Features:** ${{ github.event.inputs.ADDITIONAL }}
-🌿 **Branch:** ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
-📦 **File:** ${{ env.ZIP_NAME }}.zip
+Device: ${{ matrix.device }} ($DEVICE_NAME)
+Version: ${{ github.event.inputs.KERNEL_VERSION }}
+KernelSU: ${{ github.event.inputs.KSU_VERSION }}
+Features: ${{ github.event.inputs.ADDITIONAL }}
+Branch: ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
+File: ${{ env.ZIP_NAME }}.zip
 
-🚀 Build completed successfully!"
+Build completed successfully!"
 
           curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
                -F document=@${{ env.ZIP_NAME }}.zip \
