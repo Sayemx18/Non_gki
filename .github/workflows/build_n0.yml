@@ -616,7 +616,7 @@ jobs:
           Device: ${{ matrix.device }} ($DEVICE_NAME)
           Version: ${{ github.event.inputs.KERNEL_VERSION }}
           KernelSU: ${{ github.event.inputs.KSU_VERSION }}
-          Features: ${{ github.event.inputs.ADDITIONAL }}
+          Clang: Neutron
           Branch: ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
           File: ${{ env.ZIP_NAME }}.zip
 
