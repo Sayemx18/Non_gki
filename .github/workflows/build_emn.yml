@@ -200,6 +200,16 @@ jobs:
           
           echo "kernel-folder=$(pwd)" >> $GITHUB_OUTPUT
 
+      - name: Apply Patches
+        run: |
+          cd kernel_tree
+          git submodule deinit -f KernelSU || true
+          git rm -rf --cached KernelSU || true
+          rm -rf KernelSU
+          rm -rf .git/modules/KernelSU
+          sed -i '/KernelSU/d' .gitmodules || true 
+          
+
       - name: Setup KernelSU
         run: |
           cd kernel_tree
