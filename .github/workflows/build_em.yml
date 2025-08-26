@@ -238,26 +238,17 @@ jobs:
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           
-          # Add your fork as a remote and fetch the thin branch with more depth for cherry-picking
+          # Add your fork as a remote and fetch the last branch with more depth for cherry-picking
           echo "Adding myfork remote and fetching commits..."
-          git remote add myfork https://github.com/Sayemx18/kernel_sm8250
-          git fetch myfork thin --depth=10
+          git remote add myfork https://github.com/AlirezaParsi/pocof3
+          git fetch myfork last --depth=10
           
           # Cherry-pick the specific commits
           echo "Cherry-picking commits..."
           
-          echo "Cherry-picking commit 12e33a6ad10acd418210edad91653f9ac81fee8d..."
-          git cherry-pick 12e33a6ad10acd418210edad91653f9ac81fee8d || {
-            echo "Failed to cherry-pick 12e33a6ad10acd418210edad91653f9ac81fee8d"
-            echo "Checking cherry-pick status..."
-            git status
-            git cherry-pick --abort
-            exit 1
-          }
-          
-          echo "Cherry-picking commit bdbc535bc930f5382362adf95052b835afe2fa89..."
-          git cherry-pick bdbc535bc930f5382362adf95052b835afe2fa89 || {
-            echo "Failed to cherry-pick bdbc535bc930f5382362adf95052b835afe2fa89"
+          echo "Cherry-picking commit a34bbb74170e92093caefcbf838a379309e68c5d..."
+          git cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d || {
+            echo "Failed to cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d"
             echo "Checking cherry-pick status..."
             git status
             git cherry-pick --abort
