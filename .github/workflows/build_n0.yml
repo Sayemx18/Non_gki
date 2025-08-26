@@ -193,10 +193,7 @@ jobs:
           git config --global user.name "GitHub Action"
           git remote add myfork https://github.com/Sayemx18/kernel_sm8250
           git fetch myfork thin --depth=10
-          git cherry-pick 368ddb1a9fc5fc310fe03dd4c1c61e878ecd81ec
-          git cherry-pick a6b884cb296f03ae6001e048082ce5f943e5e4bb
-          git cherry-pick cac0a0077afa307f1fa6eb0d4eb9dd457eac1266
-
+          
           # Function to handle cherry-pick with conflict resolution
           cherry_pick_with_conflict_handling() {
             local commit=$1
