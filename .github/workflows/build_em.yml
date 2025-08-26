@@ -1,5 +1,5 @@
 # KSU Kernel Build Workflow
-name: KSU-TESTER
+name: KSU-N0
 
 on:
   pull_request:
@@ -230,6 +230,40 @@ jobs:
               echo "KernelSU is disabled"
               ;;
           esac
+          
+          # Verify KernelSU setup
+          if [[ "${{ github.event.inputs.KSU_VERSION }}" != "none" ]]; then
+            echo "Verifying KernelSU setup..."
+            if [[ -d "KernelSU" ]]; then
+              echo "✓ KernelSU directory found"
+              ls -la KernelSU/
+            else
+              echo "✗ KernelSU directory not found"
+            fi
+            
+            if [[ -f "drivers/kernelsu/Kconfig" ]]; then
+              echo "✓ KernelSU Kconfig found"
+            else
+              echo "✗ KernelSU Kconfig not found"
+              echo "Checking drivers directory structure:"
+              ls -la drivers/
+              if [[ -d "drivers/kernelsu" ]]; then
+                echo "KernelSU drivers directory exists:"
+                ls -la drivers/kernelsu/
+              fi
+            fi
+            
+            # Check if KernelSU integration was successful
+            if [[ -f "drivers/Kconfig" ]]; then
+              echo "Checking drivers/Kconfig for KernelSU integration:"
+              if grep -q "kernelsu" drivers/Kconfig; then
+                echo "✓ KernelSU integration found in drivers/Kconfig"
+              else
+                echo "✗ KernelSU integration not found in drivers/Kconfig"
+                echo "Manual integration may be required"
+              fi
+            fi
+          fi
 
       - name: Apply Patches
         run: |
@@ -362,17 +396,31 @@ jobs:
           
           # Configure KSU and additional features
           if [ "$KSU_ENABLE" -eq 1 ]; then
-              scripts/config --file out/.config -e KSU
-              echo "KSU enabled in config"
+              # Check if KernelSU was properly set up before enabling it
+              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+                  scripts/config --file out/.config -e KSU
+                  echo "KSU enabled in config"
+              else
+                  echo "Warning: KernelSU files not found, disabling KSU"
+                  scripts/config --file out/.config -d KSU
+                  echo "KSU disabled due to missing files"
+              fi
           else
               scripts/config --file out/.config -d KSU
               echo "KSU disabled in config"
           fi
 
-          # Enable KSU_MANUAL_HOOK for sukisu-ultra (and others as per script logic)
-          if [ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ] || [ "$KSU_ENABLE" -eq 1 ]; then
-              scripts/config --file out/.config -e KSU_MANUAL_HOOK
-              echo "KSU_MANUAL_HOOK enabled"
+          # Enable KSU_MANUAL_HOOK for sukisu-ultra and other KSU variants
+          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "rksu" ]] || [[ "$KSU_ENABLE" -eq 1 ]]; then
+              # Only enable if KSU was properly set up
+              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+                  scripts/config --file out/.config -e KSU_MANUAL_HOOK
+                  echo "KSU_MANUAL_HOOK enabled"
+              else
+                  echo "Warning: KernelSU not properly set up, skipping KSU_MANUAL_HOOK"
+              fi
+          else
+              echo "KSU_MANUAL_HOOK not needed for ${{ github.event.inputs.KSU_VERSION }}"
           fi
 
           # Configure KPM
@@ -426,6 +474,23 @@ jobs:
                   -d KSU_SUSFS_OPEN_REDIRECT
               echo "SuSFS features disabled"
           fi
+          
+          # Debug: Show final KSU configuration
+          echo "=== Final KSU Configuration ==="
+          echo "KSU_ENABLE: $KSU_ENABLE"
+          echo "KSU_VERSION: ${{ github.event.inputs.KSU_VERSION }}"
+          echo "Checking KSU config options in .config:"
+          if grep -q "CONFIG_KSU=y" out/.config 2>/dev/null; then
+            echo "✓ CONFIG_KSU=y found"
+          else
+            echo "✗ CONFIG_KSU not enabled or not found"
+          fi
+          if grep -q "CONFIG_KSU_MANUAL_HOOK=y" out/.config 2>/dev/null; then
+            echo "✓ CONFIG_KSU_MANUAL_HOOK=y found"
+          else
+            echo "✗ CONFIG_KSU_MANUAL_HOOK not enabled or not found"
+          fi
+          echo "=== End KSU Configuration ==="
           
           # Build the kernel
           make O=out \
