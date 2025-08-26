@@ -231,40 +231,6 @@ jobs:
               ;;
           esac
           
-          # Verify KernelSU setup
-          if [[ "${{ github.event.inputs.KSU_VERSION }}" != "none" ]]; then
-            echo "Verifying KernelSU setup..."
-            if [[ -d "KernelSU" ]]; then
-              echo "✓ KernelSU directory found"
-              ls -la KernelSU/
-            else
-              echo "✗ KernelSU directory not found"
-            fi
-            
-            if [[ -f "drivers/kernelsu/Kconfig" ]]; then
-              echo "✓ KernelSU Kconfig found"
-            else
-              echo "✗ KernelSU Kconfig not found"
-              echo "Checking drivers directory structure:"
-              ls -la drivers/
-              if [[ -d "drivers/kernelsu" ]]; then
-                echo "KernelSU drivers directory exists:"
-                ls -la drivers/kernelsu/
-              fi
-            fi
-            
-            # Check if KernelSU integration was successful
-            if [[ -f "drivers/Kconfig" ]]; then
-              echo "Checking drivers/Kconfig for KernelSU integration:"
-              if grep -q "kernelsu" drivers/Kconfig; then
-                echo "✓ KernelSU integration found in drivers/Kconfig"
-              else
-                echo "✗ KernelSU integration not found in drivers/Kconfig"
-                echo "Manual integration may be required"
-              fi
-            fi
-          fi
-
       - name: Apply Patches
         run: |
           cd kernel_tree
