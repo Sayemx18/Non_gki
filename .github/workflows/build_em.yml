@@ -275,93 +275,110 @@ jobs:
           
           # Add your fork as a remote and fetch with unshallow to get full history
           echo "Adding myfork remote and fetching commits..."
-          git remote add myfork https://github.com/Sayemx18/kernel_sm8250
+          
+          # Use the same repository as the main kernel tree for consistency
+          CHERRY_PICK_REPO="${{ github.event.inputs.KERNEL_TREE_1 }}"
+          echo "Using repository for cherry-pick: $CHERRY_PICK_REPO"
+          
+          git remote add myfork "$CHERRY_PICK_REPO"
           
           # Fetch with more depth or unshallow if needed
-          echo "Fetching myfork base branch..."
-          git fetch myfork base --unshallow || git fetch myfork base --depth=50
+          echo "Fetching myfork ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }} branch..."
+          git fetch myfork ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }} --unshallow || git fetch myfork ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }} --depth=50
           
           # List available commits to verify they exist
-          echo "Available commits from myfork/base:"
-          git log --oneline myfork/base -10
+          echo "Available commits from myfork/${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}:"
+          git log --oneline myfork/${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }} -10
           
           # Cherry-pick the specific commits with better error handling
           echo "Cherry-picking commits..."
           
-          echo "Cherry-picking commit 26633161b0395c29c36107cb493837ca3fb62d09..."
-          if git cherry-pick 26633161b0395c29c36107cb493837ca3fb62d09; then
-            echo "Successfully cherry-picked 26633161b0395c29c36107cb493837ca3fb62d09"
-          else
-            echo "Cherry-pick failed, checking for conflicts..."
-            git status
-            
-            # Check if it's a conflict that can be resolved
-            if git diff --name-only --diff-filter=U | grep -q .; then
-              echo "Conflicts found in:"
-              git diff --name-only --diff-filter=U
-              echo "Attempting to resolve conflicts automatically..."
-              
-              # Try to resolve simple conflicts (accept theirs for Kconfig changes)
-              for file in $(git diff --name-only --diff-filter=U); do
-                if [[ "$file" == *"Kconfig"* ]]; then
-                  echo "Auto-resolving Kconfig conflict in $file"
-                  git checkout --theirs "$file"
-                  git add "$file"
-                fi
-              done
-              
-              # Check if all conflicts are resolved
-              if ! git diff --name-only --diff-filter=U | grep -q .; then
-                git -c core.editor=true cherry-pick --continue
-                echo "Cherry-pick completed after conflict resolution"
-              else
-                echo "Unable to auto-resolve all conflicts"
-                git cherry-pick --abort
-                echo "Skipping this cherry-pick due to conflicts"
-              fi
+          # Check if commits exist before attempting cherry-pick
+          COMMIT1="26633161b0395c29c36107cb493837ca3fb62d09"
+          COMMIT2="8e96175e7c4acbb21fbf44c7059eb954f9a033fb"
+          
+          if git cat-file -e "$COMMIT1" 2>/dev/null; then
+            echo "Cherry-picking commit $COMMIT1..."
+            if git cherry-pick "$COMMIT1"; then
+              echo "Successfully cherry-picked $COMMIT1"
             else
-              echo "Cherry-pick failed for other reasons"
-              git cherry-pick --abort
-              echo "Skipping this cherry-pick"
+              echo "Cherry-pick failed, checking for conflicts..."
+              git status
+              
+              # Check if it's a conflict that can be resolved
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "Conflicts found in:"
+                git diff --name-only --diff-filter=U
+                echo "Attempting to resolve conflicts automatically..."
+                
+                # Try to resolve simple conflicts (accept theirs for Kconfig changes)
+                for file in $(git diff --name-only --diff-filter=U); do
+                  if [[ "$file" == *"Kconfig"* ]]; then
+                    echo "Auto-resolving Kconfig conflict in $file"
+                    git checkout --theirs "$file"
+                    git add "$file"
+                  fi
+                done
+                
+                # Check if all conflicts are resolved
+                if ! git diff --name-only --diff-filter=U | grep -q .; then
+                  git -c core.editor=true cherry-pick --continue
+                  echo "Cherry-pick completed after conflict resolution"
+                else
+                  echo "Unable to auto-resolve all conflicts"
+                  git cherry-pick --abort
+                  echo "Skipping this cherry-pick due to conflicts"
+                fi
+              else
+                echo "Cherry-pick failed for other reasons"
+                git cherry-pick --abort
+                echo "Skipping this cherry-pick"
+              fi
             fi
+          else
+            echo "Warning: Commit $COMMIT1 not found in the repository"
           fi
           
-          echo "Cherry-picking commit 8e96175e7c4acbb21fbf44c7059eb954f9a033fb..."
-          if git cherry-pick 8e96175e7c4acbb21fbf44c7059eb954f9a033fb; then
-            echo "Successfully cherry-picked 8e96175e7c4acbb21fbf44c7059eb954f9a033fb"
-          else
-            echo "Cherry-pick failed, checking for conflicts..."
-            git status
-            
-            # Check if it's a conflict that can be resolved
-            if git diff --name-only --diff-filter=U | grep -q .; then
-              echo "Conflicts found in:"
-              git diff --name-only --diff-filter=U
-              echo "Attempting to resolve conflicts automatically..."
-              
-              # Try to resolve simple conflicts
-              for file in $(git diff --name-only --diff-filter=U); do
-                if [[ "$file" == *"Kconfig"* ]]; then
-                  echo "Auto-resolving Kconfig conflict in $file"
-                  git checkout --theirs "$file"
-                  git add "$file"
-                fi
-              done
-              
-              # Check if all conflicts are resolved
-              if ! git diff --name-only --diff-filter=U | grep -q .; then
-                git -c core.editor=true cherry-pick --continue
-                echo "Cherry-pick completed after conflict resolution"
-              else
-                echo "Unable to auto-resolve all conflicts"
-                git cherry-pick --abort
-                echo "Skipping this cherry-pick due to conflicts"
-              fi
+          if git cat-file -e "$COMMIT2" 2>/dev/null; then
+            echo "Cherry-picking commit $COMMIT2..."
+            if git cherry-pick "$COMMIT2"; then
+              echo "Successfully cherry-picked $COMMIT2"
             else
-              echo "Cherry-pick failed for other reasons"
-              git cherry-pick --abort
-              echo "Skipping this cherry-pick"
+              echo "Cherry-pick failed, checking for conflicts..."
+              git status
+              
+              # Check if it's a conflict that can be resolved
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "Conflicts found in:"
+                git diff --name-only --diff-filter=U
+                echo "Attempting to resolve conflicts automatically..."
+                
+                # Try to resolve simple conflicts
+                for file in $(git diff --name-only --diff-filter=U); do
+                  if [[ "$file" == *"Kconfig"* ]]; then
+                    echo "Auto-resolving Kconfig conflict in $file"
+                    git checkout --theirs "$file"
+                    git add "$file"
+                  fi
+                done
+                
+                # Check if all conflicts are resolved
+                if ! git diff --name-only --diff-filter=U | grep -q .; then
+                  git -c core.editor=true cherry-pick --continue
+                  echo "Cherry-pick completed after conflict resolution"
+                else
+                  echo "Unable to auto-resolve all conflicts"
+                  git cherry-pick --abort
+                  echo "Skipping this cherry-pick due to conflicts"
+                fi
+              else
+                echo "Cherry-pick failed for other reasons"
+                git cherry-pick --abort
+                echo "Skipping this cherry-pick"
+              fi
             fi
+          else
+            echo "Warning: Commit $COMMIT2 not found in the repository"
           fi
           
           echo "Cherry-pick process completed"
