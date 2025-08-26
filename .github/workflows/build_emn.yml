@@ -135,18 +135,18 @@ jobs:
             echo "KSU_ENABLE=0" >> $GITHUB_ENV
           fi
           
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kpm" ]]; then
+          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kmp" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
-            echo "KPM_ENABLE=1" >> $GITHUB_ENV
+            echo "KMP_ENABLE=1" >> $GITHUB_ENV
           elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
-            echo "KPM_ENABLE=0" >> $GITHUB_ENV
-          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "kpm" ]]; then
+            echo "KMP_ENABLE=0" >> $GITHUB_ENV
+          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "kmp" ]]; then
             echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
-            echo "KPM_ENABLE=1" >> $GITHUB_ENV
+            echo "KMP_ENABLE=1" >> $GITHUB_ENV
           else
             echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
-            echo "KPM_ENABLE=0" >> $GITHUB_ENV
+            echo "KMP_ENABLE=0" >> $GITHUB_ENV
           fi
           
           # Set KSU ZIP string
@@ -181,13 +181,14 @@ jobs:
           esac
           
       - name: Clone and apply custom commits
+        id: kernel
         run: |
-        # Clone the original source with full history for cherry-pick
+          # Clone the original source with full history for cherry-pick
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
-        
+          
           cd kernel_tree
-        
-        # Configure git identity
+          
+          # Configure git identity
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git remote add myfork https://github.com/AlirezaParsi/pocof3
@@ -196,10 +197,8 @@ jobs:
           git cherry-pick 210396a9118fb7e2de2b7f99bd2cf86050dfceb3
           git cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d
           git cherry-pick f80b879d5b5e4b7a32af2fcf2bd403c5f2c8b8e1
-        
-        echo "kernel-folder=$(pwd)" >> $GITHUB_OUTPUT
-      working-directory: ${{ steps.workspace.outputs.workspace-folder }}
-      id: kernel
+          
+          echo "kernel-folder=$(pwd)" >> $GITHUB_OUTPUT
 
       - name: Setup KernelSU
         run: |
@@ -305,7 +304,7 @@ jobs:
           fi
 
           # Configure KPM
-          if [ "$KPM_ENABLE" -eq 1 ]; then
+          if [ "$KMP_ENABLE" -eq 1 ]; then
               scripts/config --file out/.config \
                   -e KPM \
                   -e KALLSYMS \
@@ -400,7 +399,7 @@ jobs:
           fi
           
           # Apply KPM patch if needed
-          if [[ "$KPM_ENABLE" -eq 1 && "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
+          if [[ "$KMP_ENABLE" -eq 1 && "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
               echo "Applying KPM patch..."
               cd out/arch/arm64/boot
               curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
