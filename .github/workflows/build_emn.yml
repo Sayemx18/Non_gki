@@ -180,8 +180,26 @@ jobs:
               ;;
           esac
           
-      - name: Checkout Kernel
-        run: git clone --depth=1 $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
+      - name: Clone and apply custom commits
+        run: |
+        # Clone the original source with full history for cherry-pick
+          git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
+        
+          cd kernel_tree
+        
+        # Configure git identity
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git remote add myfork https://github.com/AlirezaParsi/pocof3
+          git fetch myfork last --depth=10
+          git cherry-pick c392c8c3bcb7e4ecfebb9a38e627321a85e0ae45
+          git cherry-pick 210396a9118fb7e2de2b7f99bd2cf86050dfceb3
+          git cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d
+          git cherry-pick f80b879d5b5e4b7a32af2fcf2bd403c5f2c8b8e1
+        
+        echo "kernel-folder=$(pwd)" >> $GITHUB_OUTPUT
+      working-directory: ${{ steps.workspace.outputs.workspace-folder }}
+      id: kernel
 
       - name: Setup KernelSU
         run: |
@@ -230,33 +248,6 @@ jobs:
               echo "KernelSU is disabled"
               ;;
           esac
-          
-      - name: Apply Patches
-        run: |
-          cd kernel_tree
-          # Configure git identity
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          
-          # Add your fork as a remote and fetch the last branch with more depth for cherry-picking
-          echo "Adding myfork remote and fetching commits..."
-          git remote add myfork https://github.com/AlirezaParsi/pocof3
-          git fetch myfork last --depth=10
-          
-          # Cherry-pick the specific commits
-          echo "Cherry-picking commits..."
-          
-          echo "Cherry-picking commit a34bbb74170e92093caefcbf838a379309e68c5d..."
-          git cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d || {
-            echo "Failed to cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d"
-            echo "Checking cherry-pick status..."
-            git status
-            git cherry-pick --abort
-            exit 1
-          }
-          
-          echo "All commits cherry-picked successfully"
-          git log --oneline -5
           
       - name: Build Kernel
         run: |
