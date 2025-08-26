@@ -180,43 +180,12 @@ jobs:
               ;;
           esac
           
-      - name: Clone and apply custom commits
+      - name: Clone kernel source 
         id: kernel
         run: |
-          # Clone the original source with full history for cherry-pick
+          # Clone the original source
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
           
-          cd kernel_tree
-          
-          # Configure git identity
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          git remote add myfork https://github.com/Sayemx18/kernel_sm8250
-          git fetch myfork thin --depth=10
-          
-          # Function to handle cherry-pick with conflict resolution
-          cherry_pick_with_conflict_handling() {
-            local commit=$1
-            echo "Attempting to cherry-pick $commit"
-            
-            if git cherry-pick $commit; then
-              echo "✓ Successfully cherry-picked $commit"
-            else
-              echo "⚠ Conflict detected for $commit, resolving with --theirs strategy"
-              git checkout --theirs .
-              git add .
-              git cherry-pick --continue
-              echo "✓ Cherry-pick completed with conflict resolution for $commit"
-            fi
-          }
-          
-          # Apply commits with conflict handling
-          cherry_pick_with_conflict_handling 368ddb1a9fc5fc310fe03dd4c1c61e878ecd81ec
-          cherry_pick_with_conflict_handling a6b884cb296f03ae6001e048082ce5f943e5e4bb
-          cherry_pick_with_conflict_handling cac0a0077afa307f1fa6eb0d4eb9dd457eac1266
-
-          echo "kernel-folder=$(pwd)" >> $GITHUB_OUTPUT
-
       - name: Apply Patches
         run: |
           cd kernel_tree
