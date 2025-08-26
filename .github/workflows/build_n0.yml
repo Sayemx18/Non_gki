@@ -11,12 +11,12 @@ on:
         type: string
       KERNEL_TREE_1:
         description: 'Kernel Tree 1'
-        default: 'https://github.com/Sayemx18/kernel_sm8250'
+        default: 'https://github.com/EmanuelCN/kernel_xiaomi_sm8250'
         required: true
         type: string
       KERNEL_TREE_BRANCH_1:
         description: 'Kernel Tree Branch 1'
-        default: 'base'
+        default: 'staging'
         required: true
         type: string
       CODENAME:
