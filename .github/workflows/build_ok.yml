@@ -114,7 +114,7 @@ jobs:
 
       - name: Download & Extract Clang
         run: |
-          wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.zst
           mkdir clang
           unzstd -d clang.tar.zst
           tar -xf clang.tar -C clang
@@ -451,7 +451,7 @@ jobs:
             ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
           fi
           name="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
-          
+        
           cd AnyKernel3
           zip -q -r $name *
           mv $name ../
@@ -463,14 +463,14 @@ jobs:
         if: ${{ github.event.inputs.ANYKERNEL_URL != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_NAME }}
-          path: ${{ env.ZIP_NAME }}.zip
+          name: ${{ steps.anykernel.outputs.zipname }}
+          path: ${{ steps.anykernel.outputs.zipname }}
 
       - name: Upload to Release (if enabled)
         if: ${{ github.event.inputs.UPLOAD_TO_RELEASE == 'yes' && github.event.inputs.ANYKERNEL_URL != '' }}
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ env.ZIP_NAME }}.zip
+          files: ${{ steps.anykernel.outputs.zipname }}
           name: ${{ github.event.inputs.BUILD_TITLE || format('N0Kernel v{0} - Multi-Device Build', github.event.inputs.KERNEL_VERSION) }}
           tag_name: v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
           body: |
@@ -489,7 +489,7 @@ jobs:
             - **apollo:** Xiaomi Mi 10T / Mi 10T Pro
             - **munch:** POCO F4
             
-            **Download:** `${{ env.ZIP_NAME }}.zip`
+            **Download:** `${{ steps.anykernel.outputs.zipname }}`
             
             **Installation:**
             1. Download the ZIP file for your device
@@ -507,7 +507,7 @@ jobs:
         run: |
           BUILD_TITLE="${{ github.event.inputs.BUILD_TITLE }}"
           if [ -z "$BUILD_TITLE" ]; then
-            BUILD_TITLE="${{ env.ZIP_NAME }}"
+            BUILD_TITLE="${{ steps.anykernel.outputs.zipname }}"
           fi
           
           # Device name mapping
@@ -533,12 +533,12 @@ jobs:
           KernelSU: ${{ github.event.inputs.KSU_VERSION }}
           Clang: Neutron
           Branch: ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
-          File: ${{ env.ZIP_NAME }}.zip
+          File: ${{ steps.anykernel.outputs.zipname }}
 
           Build completed successfully!"
 
           curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
-               -F document=@${{ env.ZIP_NAME }}.zip \
+               -F document=@${{ steps.anykernel.outputs.zipname }} \
                -F caption="$CAPTION" \
                -F parse_mode="Markdown" \
                "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
