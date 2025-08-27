@@ -1,5 +1,5 @@
 # KSU Kernel Build Workflow
-name: N0 WITH DIFFERENT KSU VARIENTS Aosp clang
+name: N0 WITH DIFFERENT KSU VARIENTS
 
 on:
   pull_request:
