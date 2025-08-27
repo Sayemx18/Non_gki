@@ -114,7 +114,7 @@ jobs:
 
       - name: Download & Extract Clang
         run: |
-          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.zst
+          wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
           mkdir clang
           unzstd -d clang.tar.zst
           tar -xf clang.tar -C clang
