@@ -114,7 +114,7 @@ jobs:
 
       - name: Download & Extract Clang
         run: |
-          wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.zst
           mkdir clang
           unzstd -d clang.tar.zst
           tar -xf clang.tar -C clang
@@ -464,13 +464,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.anykernel.outputs.zipname }}
-          path: ${{ steps.anykernel.outputs.zipname }}
+          path: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
 
       - name: Upload to Release (if enabled)
         if: ${{ github.event.inputs.UPLOAD_TO_RELEASE == 'yes' && github.event.inputs.ANYKERNEL_URL != '' }}
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ steps.anykernel.outputs.zipname }}
+          files: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
           name: ${{ github.event.inputs.BUILD_TITLE || format('N0Kernel v{0} - Multi-Device Build', github.event.inputs.KERNEL_VERSION) }}
           tag_name: v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
           body: |
@@ -538,7 +538,7 @@ jobs:
           Build completed successfully!"
 
           curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
-               -F document=@${{ steps.anykernel.outputs.zipname }} \
+               -F document=@kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }} \
                -F caption="$CAPTION" \
                -F parse_mode="Markdown" \
                "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
