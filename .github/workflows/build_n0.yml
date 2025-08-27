@@ -1,5 +1,5 @@
 # KSU Kernel Build Workflow
-name: N0 WITH DIFFERENT KSU VARIENTS
+name: N0 WITH DIFFERENT KSU VARIENTS Neutron
 
 on:
   pull_request:
