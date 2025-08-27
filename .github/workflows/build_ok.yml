@@ -505,40 +505,13 @@ jobs:
       - name: Upload Kernel to Telegram
         if: ${{ github.event.inputs.UPLOAD_TO_TELEGRAM == 'yes' && github.event.inputs.ANYKERNEL_URL != '' }}
         run: |
-          BUILD_TITLE="${{ github.event.inputs.BUILD_TITLE }}"
-          if [ -z "$BUILD_TITLE" ]; then
-            BUILD_TITLE="${{ steps.anykernel.outputs.zipname }}"
-          fi
-          
-          # Device name mapping
-          case "${{ matrix.device }}" in
-            "alioth")
-              DEVICE_NAME="Redmi K40 / POCO F3"
-              ;;
-            "apollo") 
-              DEVICE_NAME="Xiaomi Mi 10T / Mi 10T Pro"
-              ;;
-            "munch")
-              DEVICE_NAME="POCO F4"
-              ;;
-            *)
-              DEVICE_NAME="${{ matrix.device }}"
-              ;;
-          esac
-          
-          CAPTION="**N0Kernel v${{ github.event.inputs.KERNEL_VERSION }}**
-
-          Device: ${{ matrix.device }} ($DEVICE_NAME)
-          Version: ${{ github.event.inputs.KERNEL_VERSION }}
-          KernelSU: ${{ github.event.inputs.KSU_VERSION }}
-          Clang: Neutron
-          Branch: ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
-          File: ${{ steps.anykernel.outputs.zipname }}
-
-          Build completed successfully!"
+          FILE="${{ steps.anykernel.outputs.zipname }}"
+          CAPTION="N0Kernel build completed 
+          Device: ${{ matrix.device }}
+          File: $FILE"
 
           curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
-               -F document=@kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }} \
-               -F caption="$CAPTION" \
-               -F parse_mode="Markdown" \
-               "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
+          -F document=@kernel_tree/out/arch/arm64/boot/$FILE \
+          -F caption="$CAPTION" \
+          -F parse_mode="HTML" \
+          "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
