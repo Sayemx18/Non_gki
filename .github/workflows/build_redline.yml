@@ -148,7 +148,7 @@ jobs:
             echo "KSU_ENABLE=0" >> $GITHUB_ENV
           fi
           
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kpm" ]]; then
+          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kmp" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
             echo "KPM_ENABLE=1" >> $GITHUB_ENV
           elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
@@ -354,6 +354,10 @@ jobs:
               echo "SuSFS features disabled"
           fi
           
+          # Force resolve configuration without interaction using olddefconfig
+          echo "Resolving configuration conflicts..."
+          make O=out ARCH=arm64 olddefconfig
+          
           # Debug: Show final KSU configuration
           echo "=== Final KSU Configuration ==="
           echo "KSU_ENABLE: $KSU_ENABLE"
@@ -487,4 +491,3 @@ jobs:
           -F caption="$CAPTION" \
           -F parse_mode="HTML" \
           "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
-          
