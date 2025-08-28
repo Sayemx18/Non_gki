@@ -371,7 +371,8 @@ jobs:
           fi
           echo "=== End KSU Configuration ==="
 
-          yes "" | make O=out oldconfig
+          yes "" | make O=out olddefconfig
+          yes "" | make O=out prepare
           
           # Build the kernel
           make O=out \
