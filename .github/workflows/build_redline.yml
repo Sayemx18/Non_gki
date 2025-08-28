@@ -216,7 +216,7 @@ jobs:
         find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > dtb
         
         # Generate dtbo.img from all dtbo files
-        find out/arch/arm64/boot/dts -name '*.dtbo' -exec cat {} + > dtbo.img 2>/dev/null || echo "No DTBO files found, creating empty dtbo.img"
+        find out/arch/arm64/boot/dts/vendor -name '*.dtbo' -exec cat {} + > dtbo.img 2>/dev/null || echo "No DTBO files found, creating empty dtbo.img"
         touch dtbo.img  # Ensure file exists even if no DTBOs found
         
         # Copy all images to anykernel directory
@@ -234,39 +234,15 @@ jobs:
         name: kernel-${{ steps.device.outputs.device }}-${{ github.event.inputs.ksu_version }}-${{ github.event.inputs.target_system }}
         path: |
           *.zip
-          out/arch/arm64/boot/Image
-          out/arch/arm64/boot/dtb
-          out/arch/arm64/boot/dtbo.img
         retention-days: 30
 
     - name: Upload to Telegram
-      if: env.TG_BOT_TOKEN != '' && env.TG_BOT_ID != ''
+      if: env.TG_BOT_TOKEN != '' && env.TG_CHAT_ID != ''
       run: |
-        # Get the ZIP file name
         ZIP_FILE=$(ls *.zip | head -1)
-        if [ -z "$ZIP_FILE" ]; then
-          echo "No ZIP file found to upload"
-          exit 1
-        fi
-        
-        # Get file size in MB
-        FILE_SIZE=$(stat -c%s "$ZIP_FILE" | awk '{print int($1/1024/1024)}')
-        
-        # Telegram bot API has 50MB limit for documents
-        if [ $FILE_SIZE -gt 50 ]; then
-          echo "File size (${FILE_SIZE}MB) exceeds Telegram's 50MB limit"
-          curl -X POST "https://api.telegram.org/bot${{ env.TG_BOT_TOKEN }}/sendMessage" \
-               -H "Content-Type: application/json" \
-               -d "{
-                 \"chat_id\": \"${{ env.TG_BOT_ID }}\",
-                 \"text\": \"Build completed: ${ZIP_FILE} (${FILE_SIZE}MB - too large for upload)\"
-               }"
-        else
-          echo "Uploading $ZIP_FILE (${FILE_SIZE}MB) to Telegram..."
-          curl -F "chat_id=${{ env.TG_BOT_ID }}" \
-               -F "document=@$ZIP_FILE" \
-               "https://api.telegram.org/bot${{ env.TG_BOT_TOKEN }}/sendDocument"
-        fi
+        curl -F "chat_id=${{ env.TG_CHAT_ID }}" \
+             -F "document=@$ZIP_FILE" \
+             "https://api.telegram.org/bot${{ env.TG_BOT_TOKEN }}/sendDocument"
       env:
         TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-        TG_BOT_ID: ${{ secrets.TG_BOT_ID }}
+        TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
