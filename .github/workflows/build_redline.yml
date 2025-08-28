@@ -404,7 +404,7 @@ jobs:
           if [[ "$KPM_ENABLE" -eq 1 && "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
               echo "Applying KPM patch..."
               cd out/arch/arm64/boot
-              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
+              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
               chmod +x patch
               ./patch
               if [ $? -eq 0 ]; then
