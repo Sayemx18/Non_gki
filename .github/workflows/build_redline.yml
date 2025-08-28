@@ -257,7 +257,8 @@ jobs:
           # Setup ccache properly
           export CCACHE_DIR="$HOME/.cache/ccache"
           export USE_CCACHE=1
-
+          
+          # Force use of clang for all compilation
           export CC=clang
           export CXX=clang++
           export HOSTCC=clang
@@ -270,6 +271,9 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
           
+          # Verify clang is available
+          which clang || { echo "Clang not found in PATH"; exit 1; }
+          clang --version
           
           cd kernel_tree
           
@@ -283,7 +287,7 @@ jobs:
           sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${{ matrix.device }}_defconfig
           
           # Build kernel config
-          make O=out ${{ matrix.device }}_defconfig
+          make O=out ARCH=arm64 ${{ matrix.device }}_defconfig
           
           # Configure KSU and additional features
           if [ "$KSU_ENABLE" -eq 1 ]; then
@@ -383,10 +387,11 @@ jobs:
           fi
           echo "=== End KSU Configuration ==="
 
-          yes "" | make O=out olddefconfig
-          yes "" | make O=out prepare
+          # Regenerate config properly
+          make O=out ARCH=arm64 olddefconfig
+          make O=out ARCH=arm64 prepare
           
-          # Build the kernel
+          # Build the kernel with proper compiler flags
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
@@ -404,9 +409,10 @@ jobs:
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             -j$(nproc --all)
+          
 
       - name: Apply KPM Patch
         run: |
