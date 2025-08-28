@@ -462,7 +462,7 @@ jobs:
           if [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]]; then
             ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
           fi
-          name="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
+          name="REDLINEKernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
           
           cd AnyKernel3
           zip -q -r $name *
