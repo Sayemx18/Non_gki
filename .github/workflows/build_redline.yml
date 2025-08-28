@@ -257,6 +257,19 @@ jobs:
           # Setup ccache properly
           export CCACHE_DIR="$HOME/.cache/ccache"
           export USE_CCACHE=1
+
+          export CC=clang
+          export CXX=clang++
+          export HOSTCC=clang
+          export HOSTCXX=clang++
+          export HOSTLD=ld.lld
+          export LD=ld.lld
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+          
           
           cd kernel_tree
           
@@ -379,10 +392,17 @@ jobs:
             SUBARCH=arm64 \
             LLVM=1 \
             LLVM_IAS=1 \
-            CC="ccache clang" \
-            CXX="ccache clang++" \
+            CC=clang \
+            CXX=clang++ \
             HOSTCC=clang \
             HOSTCXX=clang++ \
+            HOSTLD=ld.lld \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             CLANG_TRIPLE=aarch64-linux-gnu- \
