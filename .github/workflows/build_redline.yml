@@ -1,5 +1,5 @@
 # KSU Kernel Build Workflow
-name: KSU-N0
+name: Redline kernel
 
 on:
   pull_request:
@@ -11,12 +11,12 @@ on:
         type: string
       KERNEL_TREE_1:
         description: 'Kernel Tree 1'
-        default: 'https://github.com/Sayemx18/kernel_sm8250'
+        default: 'https://github.com/Sayemx18/kernel_xiaomi_sm8250'
         required: true
         type: string
       KERNEL_TREE_BRANCH_1:
         description: 'Kernel Tree Branch 1'
-        default: 'base'
+        default: 'aosp-16'
         required: true
         type: string
       CODENAME:
@@ -55,11 +55,6 @@ on:
           - 'susfs-kpm'
         default: 'none'
         required: false
-      ANYKERNEL_URL:
-        description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
-        default: 'https://github.com/Sayemx18/AKalioth'
-        required: false
-        type: string
       UPLOAD_TO_TELEGRAM:
         description: 'Upload to Telegram'
         type: choice
@@ -112,7 +107,17 @@ jobs:
         with:
           key: ${{ github.workflow }}-${{ github.job }}-${{ matrix.device }}
 
+      - name: Cache Clang Toolchain
+        id: clang-cache
+        uses: actions/cache@v4
+        with:
+          path: clang
+          key: neutron-clang-10032024
+          restore-keys: |
+            neutron-clang-
+      
       - name: Download & Extract Clang
+        if: steps.clang-cache.outputs.cache-hit != 'true'
         run: |
           wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
           mkdir clang
@@ -135,18 +140,18 @@ jobs:
             echo "KSU_ENABLE=0" >> $GITHUB_ENV
           fi
           
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kmp" ]]; then
+          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kpm" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
-            echo "KMP_ENABLE=1" >> $GITHUB_ENV
+            echo "KPM_ENABLE=1" >> $GITHUB_ENV
           elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
-            echo "KMP_ENABLE=0" >> $GITHUB_ENV
-          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "kmp" ]]; then
+            echo "KPM_ENABLE=0" >> $GITHUB_ENV
+          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "kpm" ]]; then
             echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
-            echo "KMP_ENABLE=1" >> $GITHUB_ENV
+            echo "KPM_ENABLE=1" >> $GITHUB_ENV
           else
             echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
-            echo "KMP_ENABLE=0" >> $GITHUB_ENV
+            echo "KPM_ENABLE=0" >> $GITHUB_ENV
           fi
           
           # Set KSU ZIP string
@@ -180,26 +185,12 @@ jobs:
               ;;
           esac
           
-      - name: Clone and apply custom commits
+      - name: Clone kernel source 
         id: kernel
         run: |
-          # Clone the original source with full history for cherry-pick
+          # Clone the original source
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
           
-          cd kernel_tree
-          
-          # Configure git identity
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          git remote add myfork https://github.com/AlirezaParsi/pocof3
-          git fetch myfork last --depth=10
-          git cherry-pick c392c8c3bcb7e4ecfebb9a38e627321a85e0ae45
-          git cherry-pick 210396a9118fb7e2de2b7f99bd2cf86050dfceb3
-          git cherry-pick a34bbb74170e92093caefcbf838a379309e68c5d
-          git cherry-pick f80b879d5b5e4b7a32af2fcf2bd403c5f2c8b8e1
-          
-          echo "kernel-folder=$(pwd)" >> $GITHUB_OUTPUT
-
       - name: Apply Patches
         run: |
           cd kernel_tree
@@ -285,7 +276,7 @@ jobs:
           sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/vendor/${{ matrix.device }}_defconfig
           
           # Build kernel config
-          make O=out vendor/${{ matrix.device }}_defconfig
+          make O=out ${{ matrix.device }}_defconfig
           
           # Configure KSU and additional features
           if [ "$KSU_ENABLE" -eq 1 ]; then
@@ -317,7 +308,7 @@ jobs:
           fi
 
           # Configure KPM
-          if [ "$KMP_ENABLE" -eq 1 ]; then
+          if [ "$KPM_ENABLE" -eq 1 ]; then
               scripts/config --file out/.config \
                   -e KPM \
                   -e KALLSYMS \
@@ -399,7 +390,7 @@ jobs:
             CLANG_TRIPLE=aarch64-linux-gnu- \
             -j$(nproc --all)
 
-      - name: Post-Build Processing
+      - name: Apply KPM Patch
         run: |
           cd kernel_tree
           
@@ -412,7 +403,7 @@ jobs:
           fi
           
           # Apply KPM patch if needed
-          if [[ "$KMP_ENABLE" -eq 1 && "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
+          if [[ "$KPM_ENABLE" -eq 1 && "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
               echo "Applying KPM patch..."
               cd out/arch/arm64/boot
               curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
@@ -423,208 +414,82 @@ jobs:
                   mv oImage Image
                   echo "KPM patch applied successfully"
               else
-                  echo "KMP Patch Failed, using original Image"
+                  echo "KPM Patch Failed, using original Image"
               fi
-              cd $GITHUB_WORKSPACE/kernel_tree
-          fi
-          
-          # Generate DTB
-          echo "Generating DTB..."
-          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
-          
-          # Generate DTBO if available
-          echo "Generating DTBO..."
-          if find out/arch/arm64/boot/dts -name '*.dtbo' | grep -q .; then
-              find out/arch/arm64/boot/dts -name '*.dtbo' | sort | while read file; do
-                  cat "$file" >> out/arch/arm64/boot/dtbo.img
-              done
-              echo "DTBO generated successfully"
-          else
-              echo "No DTBO files found"
-          fi
-          
-          # Copy files for upload
-          cp out/arch/arm64/boot/Image.gz ../Image.gz
-          cp out/arch/arm64/boot/dtb ../dtb
-          if [ -f "out/arch/arm64/boot/dtbo.img" ]; then
-              cp out/arch/arm64/boot/dtbo.img ../dtbo.img
           fi
 
-      - name: Upload Kernel Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-artifacts-${{ matrix.device }}-${{ env.KSU_ZIP_STR }}
-          path: |
-            Image.gz
-            dtb
-            dtbo.img
-
-  package_anykernel:
-    needs: [setup, build]
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.ANYKERNEL_URL != '' }}
-    strategy:
-      matrix:
-        device: ${{ fromJson(needs.setup.outputs.matrix) }}
-
-    steps:
-      - name: Set Environment Variables
-        run: |
-          # Recreate environment variables for this job
-          case "${{ github.event.inputs.KSU_VERSION }}" in
-            "ksu")
-              echo "KSU_ZIP_STR=KernelSU" >> $GITHUB_ENV
-              ;;
-            "rksu")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs"* ]]; then
-                echo "KSU_ZIP_STR=RKSU_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=RKSU" >> $GITHUB_ENV
-              fi
-              ;;
-            "sukisu")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs"* ]]; then
-                echo "KSU_ZIP_STR=SukiSU_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=SukiSU" >> $GITHUB_ENV
-              fi
-              ;;
-            "sukisu-ultra")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs"* ]]; then
-                echo "KSU_ZIP_STR=SukiSU-Ultra_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=SukiSU-Ultra" >> $GITHUB_ENV
-              fi
-              ;;
-            *)
-              echo "KSU_ZIP_STR=NoKernelSU" >> $GITHUB_ENV
-              ;;
-          esac
-
-      - name: Download Kernel Build
-        uses: actions/download-artifact@v4
-        with:
-          name: kernel-artifacts-${{ matrix.device }}-${{ env.KSU_ZIP_STR }}
-          path: kernel-artifacts
-
-      - name: Clone AnyKernel3
+      - name: AnyKernel3
+        if: success()
         run: |
           case "${{ matrix.device }}" in
             "alioth")
               echo "Cloning AnyKernel3 for alioth"
-              git clone --recursive --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
+              git clone --recursive --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main AnyKernel3
               ;;
             "apollo")
               echo "Cloning AnyKernel3 for apollo"
-              git clone --recursive --depth=1 https://github.com/Sayemx18/AKapollo -b main AnyKernel3
+              git clone --recursive --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main AnyKernel3
               ;;
             "munch")
               echo "Cloning AnyKernel3 for munch" 
-              git clone --recursive --depth=1 https://github.com/Sayemx18/AKmunch -b main AnyKernel3
+              git clone --recursive --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main AnyKernel3
               ;;
             *)
               echo "Unknown device: ${{ matrix.device }}. Using default AnyKernel3 for alioth..."
               git clone --recursive --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
               ;;
           esac
-
-      - name: Move Kernel Files to AnyKernel3
-        run: |
-          mv kernel-artifacts/* AnyKernel3/
-
-      - name: Define ZIP Name
-        run: |
-          COMPILED_DATE=$(date +%Y%m%d_%H%M%S)
+          if [ -e "Image.gz" ]; then
+            cp -f Image.gz AnyKernel3
+          fi
+          if [ -e "dtb.img" ]; then
+            mv -f dtb.img dtb
+            cp -f dtb AnyKernel3/dtb
+          fi
+          if [ -e "dtbo.img" ]; then
+            cp -f dtbo.img AnyKernel3
+          fi
+          build_date=$(date +"%Y%m%d-%H%M%S")
           ADDITIONAL_STR=""
           if [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]]; then
             ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
           fi
-          echo "ZIP_NAME=N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${COMPILED_DATE}_anykernel3" >> $GITHUB_ENV
-      
-      - name: Create Flashable ZIP
-        run: |
+          name="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
+          
           cd AnyKernel3
-          zip -r9 ../${{ env.ZIP_NAME }}.zip ./* -x .git .gitignore out/ ./*.zip
+          zip -q -r $name *
+          mv $name ../
+          echo "zipname=$name" >> $GITHUB_OUTPUT
+        working-directory: kernel_tree/out/arch/arm64/boot/
+        id: anykernel
 
       - name: Upload Flashable Kernel Zip
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_NAME }}
-          path: ${{ env.ZIP_NAME }}.zip
+          name: ${{ steps.anykernel.outputs.zipname }}
+          path: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
 
       - name: Upload to Release (if enabled)
         if: ${{ github.event.inputs.UPLOAD_TO_RELEASE == 'yes' }}
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ env.ZIP_NAME }}.zip
-          name: ${{ github.event.inputs.BUILD_TITLE || format('N0Kernel v{0} - Multi-Device Build', github.event.inputs.KERNEL_VERSION) }}
+          files: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
           tag_name: v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
-          body: |
-            **N0Kernel v${{ github.event.inputs.KERNEL_VERSION }} Build**
-            
-            **Build Configuration:**
-            - **Device:** ${{ matrix.device }}
-            - **Version:** ${{ github.event.inputs.KERNEL_VERSION }}
-            - **KernelSU:** ${{ github.event.inputs.KSU_VERSION }}
-            - **Additional Features:** ${{ github.event.inputs.ADDITIONAL }}
-            - **Kernel Tree:** ${{ github.event.inputs.KERNEL_TREE_1 }}
-            - **Branch:** ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
-            
-            **Device Support:**
-            - **alioth:** Redmi K40 / POCO F3
-            - **apollo:** Xiaomi Mi 10T / Mi 10T Pro
-            - **munch:** POCO F4
-            
-            **Download:** `${{ env.ZIP_NAME }}.zip`
-            
-            **Installation:**
-            1. Download the ZIP file for your device
-            2. Boot into custom recovery (TWRP/OrangeFox)
-            3. Flash the kernel ZIP
-            4. Reboot and enjoy!
-            
-            ---
-            *Built with GitHub Actions*
+          name: ${{ github.event.inputs.BUILD_TITLE || format('Kernel v{0}', github.event.inputs.KERNEL_VERSION) }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      
       - name: Upload Kernel to Telegram
         if: ${{ github.event.inputs.UPLOAD_TO_TELEGRAM == 'yes' }}
         run: |
-          BUILD_TITLE="${{ github.event.inputs.BUILD_TITLE }}"
-          if [ -z "$BUILD_TITLE" ]; then
-            BUILD_TITLE="${{ env.ZIP_NAME }}"
-          fi
-          
-          # Device name mapping
-          case "${{ matrix.device }}" in
-            "alioth")
-              DEVICE_NAME="Redmi K40 / POCO F3"
-              ;;
-            "apollo") 
-              DEVICE_NAME="Xiaomi Mi 10T / Mi 10T Pro"
-              ;;
-            "munch")
-              DEVICE_NAME="POCO F4"
-              ;;
-            *)
-              DEVICE_NAME="${{ matrix.device }}"
-              ;;
-          esac
-          
-          CAPTION="**N0Kernel v${{ github.event.inputs.KERNEL_VERSION }}**
-
-          Device: ${{ matrix.device }} ($DEVICE_NAME)
-          Version: ${{ github.event.inputs.KERNEL_VERSION }}
-          KernelSU: ${{ github.event.inputs.KSU_VERSION }}
-          Features: ${{ github.event.inputs.ADDITIONAL }}
-          Branch: ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
-          File: ${{ env.ZIP_NAME }}.zip
-
-          Build completed successfully!"
+          FILE="${{ steps.anykernel.outputs.zipname }}"
+          CAPTION="N0Kernel build completed 
+          Device: ${{ matrix.device }}
+          File: $FILE"
 
           curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
-               -F document=@${{ env.ZIP_NAME }}.zip \
-               -F caption="$CAPTION" \
-               -F parse_mode="Markdown" \
-               "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
+          -F document=@kernel_tree/out/arch/arm64/boot/$FILE \
+          -F caption="$CAPTION" \
+          -F parse_mode="HTML" \
+          "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
+          
