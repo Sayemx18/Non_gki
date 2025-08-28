@@ -94,6 +94,14 @@ jobs:
           clang \
           lld \
           llvm
+          sudo apt update
+          sudo apt install -y software-properties-common
+          apt policy python2
+          sudo apt install -y python2
+          python2 --version
+          curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+          sudo python2.7 get-pip.py
+          pip2.7 --version
         
         # Set up ccache
         echo "CCACHE_DIR=$HOME/.cache/ccache_mikernel" >> $GITHUB_ENV
