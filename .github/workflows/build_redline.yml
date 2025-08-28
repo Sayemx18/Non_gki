@@ -148,7 +148,7 @@ jobs:
             echo "KSU_ENABLE=0" >> $GITHUB_ENV
           fi
           
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kmp" ]]; then
+          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kpm" ]]; then
             echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
             echo "KPM_ENABLE=1" >> $GITHUB_ENV
           elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
@@ -251,13 +251,12 @@ jobs:
         run: |
           export PATH="$(pwd)/clang/bin:$PATH"
           export ARCH=arm64
-          export SUBARCH=ARM64
+          export SUBARCH=arm64
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           
-          # Setup ccache
+          # Setup ccache properly
           export CCACHE_DIR="$HOME/.cache/ccache"
-          export CC="ccache clang"
-          export CXX="ccache clang++"
+          export USE_CCACHE=1
           
           cd kernel_tree
           
