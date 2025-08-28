@@ -228,42 +228,9 @@ jobs:
         echo "Files in anykernel directory:"
         ls -la anykernel/
 
-    - name: Create Flashable ZIP
-      run: |
-        cd anykernel
-        GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
-        TARGET_DEVICE="${{ steps.device.outputs.device }}"
-        KSU_VERSION="${{ github.event.inputs.ksu_version }}"
-        TARGET_SYSTEM="${{ github.event.inputs.target_system }}"
-        
-        # Determine KSU string for filename
-         case "$KSU_VERSION" in
-          "ksu") KSU_ZIP_STR="KernelSU" ;;
-          "rksu") KSU_ZIP_STR="RKSU" ;;
-          "sukisu") KSU_ZIP_STR="SukiSU" ;;
-          "sukisu-ultra") KSU_ZIP_STR="SukiSU-Ultra" ;;
-          *) KSU_ZIP_STR="NoKernelSU" ;;
-        esac
-        
-        # Create ZIP filename based on system type
-        if [ "$TARGET_SYSTEM" = "miui" ]; then
-          ZIP_FILENAME="Kernel_MIUI_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
-        elif [ "$TARGET_SYSTEM" = "aosp" ]; then
-          ZIP_FILENAME="Kernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
-        else
-          ZIP_FILENAME="Kernel_Universal_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
-        fi
-        
-        # Create flashable zip
-        zip -r9 "$ZIP_FILENAME" ./* -x .git .gitignore out/ ./*.zip
-        
-        # Move zip to parent directory
-        mv "$ZIP_FILENAME" ../
-        cd ..
-        
-        echo "Created flashable ZIP: $ZIP_FILENAME"
-        uses: actions/upload-artifact@v4
-        with:
+    - name: Upload Kernel Artifacts
+      uses: actions/upload-artifact@v4
+      with:
         name: kernel-${{ steps.device.outputs.device }}-${{ github.event.inputs.ksu_version }}-${{ github.event.inputs.target_system }}
         path: |
           *.zip
@@ -272,35 +239,34 @@ jobs:
           out/arch/arm64/boot/dtbo.img
         retention-days: 30
 
-  #  - name: Create Release
-  #    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-  #    uses: softprops/action-gh-release@v1
-  #    with:
-  #      tag_name: kernel-${{ steps.device.outputs.device }}-${{ github.run_number }}
-   #     name: Kernel Build for ${{ steps.device.outputs.device }}
-   #     body: |
-  #        **Build Configuration:**
-  #        - Device: ${{ steps.device.outputs.device }}
-    #      - KernelSU: ${{ github.event.inputs.ksu_version }}
-    #      - Additional Features: ${{ github.event.inputs.additional_features }}
-       #   - Target System: ${{ github.event.inputs.target_system }}
-      #    - Kernel Source: ${{ github.event.inputs.kernel_source }}
-        #  - Branch: ${{ github.event.inputs.kernel_branch }}
-          
-      #    **Build Information:**
-      #    - Commit: ${{ github.sha }}
-   #       - Build Date: ${{ github.run_number }}
-    #    files: |
-    #      *.zip
-  #      draft: false
-   #     prerelease: true
-  #    env:
-     #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Cleanup
-      if: always()
+    - name: Upload to Telegram
+      if: env.TG_BOT_TOKEN != '' && env.TG_BOT_ID != ''
       run: |
-        rm -rf out/
-        rm -rf anykernel/
-        rm -rf $HOME/toolchain/
-        ccache -C
+        # Get the ZIP file name
+        ZIP_FILE=$(ls *.zip | head -1)
+        if [ -z "$ZIP_FILE" ]; then
+          echo "No ZIP file found to upload"
+          exit 1
+        fi
+        
+        # Get file size in MB
+        FILE_SIZE=$(stat -c%s "$ZIP_FILE" | awk '{print int($1/1024/1024)}')
+        
+        # Telegram bot API has 50MB limit for documents
+        if [ $FILE_SIZE -gt 50 ]; then
+          echo "File size (${FILE_SIZE}MB) exceeds Telegram's 50MB limit"
+          curl -X POST "https://api.telegram.org/bot${{ env.TG_BOT_TOKEN }}/sendMessage" \
+               -H "Content-Type: application/json" \
+               -d "{
+                 \"chat_id\": \"${{ env.TG_BOT_ID }}\",
+                 \"text\": \"Build completed: ${ZIP_FILE} (${FILE_SIZE}MB - too large for upload)\"
+               }"
+        else
+          echo "Uploading $ZIP_FILE (${FILE_SIZE}MB) to Telegram..."
+          curl -F "chat_id=${{ env.TG_BOT_ID }}" \
+               -F "document=@$ZIP_FILE" \
+               "https://api.telegram.org/bot${{ env.TG_BOT_TOKEN }}/sendDocument"
+        fi
+      env:
+        TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        TG_BOT_ID: ${{ secrets.TG_BOT_ID }}
