@@ -1,0 +1,278 @@
+name: Build Android Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_source:
+        description: 'Kernel Source Repository'
+        required: true
+        default: 'https://github.com/your-username/kernel_source.git'
+        type: string
+      kernel_branch:
+        description: 'Kernel Branch'
+        required: true
+        default: 'main'
+        type: string
+      target_device:
+        description: 'Target Device'
+        required: true
+        default: 'lmi'
+        type: choice
+        options:
+          - 'lmi'
+          - 'umi'
+          - 'cmi'
+          - 'cas'
+          - 'apollo'
+          - 'alioth'
+          - 'munch'
+          - 'psyche'
+          - 'diting'
+          - 'marble'
+          - 'custom'
+      custom_device:
+        description: 'Custom Device Name (if "custom" selected above)'
+        required: false
+        type: string
+      ksu_version:
+        description: 'KernelSU Version'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - 'none'
+          - 'ksu'
+          - 'rksu'
+          - 'sukisu'
+          - 'sukisu-ultra'
+      additional_features:
+        description: 'Additional Features'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - 'none'
+          - 'susfs'
+          - 'kpm'
+          - 'susfs-kpm'
+      target_system:
+        description: 'Target System'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - 'aosp'
+          - 'miui'
+          - 'both'
+      toolchain_url:
+        description: 'Toolchain URL'
+        required: false
+        default: 'https://github.com/kdrag0n/proton-clang/releases/download/20240101/proton-clang-20240101.tar.xz'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout Kernel Source
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.inputs.kernel_source }}
+        ref: ${{ github.event.inputs.kernel_branch }}
+        fetch-depth: 1
+
+    - name: Setup Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          bc \
+          curl \
+          git \
+          zip \
+          libssl-dev \
+          libfl-dev \
+          python3 \
+          ccache \
+          clang \
+          lld \
+          llvm
+          sudo apt update
+          sudo apt install -y software-properties-common
+          apt policy python2
+          sudo apt install -y python2
+          python2 --version
+          curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+          sudo python2.7 get-pip.py
+          pip2.7 --version
+        
+        # Set up ccache
+        echo "CCACHE_DIR=$HOME/.cache/ccache_mikernel" >> $GITHUB_ENV
+        echo "CC=ccache gcc" >> $GITHUB_ENV
+        echo "CXX=ccache g++" >> $GITHUB_ENV
+        echo "/usr/lib/ccache:$PATH" >> $GITHUB_PATH
+
+    - name: Cache Proton Clang
+      uses: actions/cache@v4
+      id: clang-cache
+      with:
+        path: toolchain/proton-clang
+        key: ${{ runner.os }}-proton-clang
+
+    - name: Download Proton Clang Toolchain
+      if: steps.clang-cache.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p toolchain; cd toolchain
+        wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
+        unzip 20210522.zip
+        mv proton-clang-20210522 proton-clang
+        rm proton-clang/bin/ld 20210522.zip
+        
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache_mikernel
+        key: ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-
+
+    - name: Setup Toolchain PATH
+      run: |
+        echo "$PWD/toolchain/proton-clang/bin:$PATH" >> $GITHUB_PATH
+        # Verify toolchain
+        ls -la toolchain/proton-clang/bin/
+
+    - name: Determine Target Device
+      id: device
+      run: |
+        if [ "${{ github.event.inputs.target_device }}" = "custom" ]; then
+          if [ -z "${{ github.event.inputs.custom_device }}" ]; then
+            echo "Error: Custom device name is required when 'custom' is selected"
+            exit 1
+          fi
+          echo "device=${{ github.event.inputs.custom_device }}" >> $GITHUB_OUTPUT
+        else
+          echo "device=${{ github.event.inputs.target_device }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Clone AnyKernel3
+      run: |
+        git clone https://github.com/Sayemx18/AnyKernel3 -b main --single-branch --depth=1 anykernel
+
+    - name: Build Kernel
+      run: |
+        TARGET_DEVICE="${{ steps.device.outputs.device }}"
+        KSU_VERSION="${{ github.event.inputs.ksu_version }}"
+        ADDITIONAL="${{ github.event.inputs.additional_features }}"
+        TARGET_SYSTEM="${{ github.event.inputs.target_system }}"
+        
+        # Check if defconfig exists
+        if [ ! -f "arch/arm64/configs/${TARGET_DEVICE}_defconfig" ]; then
+          echo "Error: No defconfig found for device: ${TARGET_DEVICE}"
+          echo "Available defconfigs:"
+          ls arch/arm64/configs/*_defconfig || echo "No defconfigs found"
+          exit 1
+        fi
+        
+        # Setup environment variables
+        export CCACHE_DIR="$HOME/.cache/ccache_mikernel" 
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export PATH="/usr/lib/ccache:$PWD/toolchain/proton-clang/bin:$PATH"
+        
+        # Setup build arguments
+        MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+        GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
+        
+        # Add date to local version
+        local_version_str="-perf"
+        local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+        sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+        
+        # Prepare arguments
+        BUILD_ARGS="$TARGET_DEVICE"
+        
+        if [ "$KSU_VERSION" != "none" ]; then
+          BUILD_ARGS="$BUILD_ARGS $KSU_VERSION"
+        fi
+        
+        if [ "$ADDITIONAL" != "none" ]; then
+          BUILD_ARGS="$BUILD_ARGS $ADDITIONAL"
+        fi
+        
+        if [ "$TARGET_SYSTEM" != "both" ]; then
+          BUILD_ARGS="$BUILD_ARGS $TARGET_SYSTEM"
+        fi
+        
+        echo "Building with arguments: $BUILD_ARGS"
+        
+        # Set executable permissions and update toolchain path in script
+        chmod +x build.sh
+        sed -i "s|TOOLCHAIN_PATH=\$HOME/toolchain/proton-clang/bin|TOOLCHAIN_PATH=$PWD/toolchain/proton-clang/bin|g" build.sh
+        
+        # Run the build script
+        ./build.sh $BUILD_ARGS
+
+    - name: Generate DTBO and Package Images
+      run: |
+        # Generate dtb from all dtb files
+        find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > dtb
+        
+        # Generate dtbo.img from all dtbo files (check multiple possible locations)
+        DTBO_FOUND=0
+        for dtbo_path in "out/arch/arm64/boot/dts/vendor" "out/arch/arm64/boot/dts" "out/arch/arm64/boot"; do
+          if find "$dtbo_path" -name "*.dtbo" 2>/dev/null | grep -q .; then
+            echo "Found DTBO files in $dtbo_path"
+            find "$dtbo_path" -name "*.dtbo" -exec cat {} + > dtbo.img
+            DTBO_FOUND=1
+            break
+          fi
+        done
+        
+        # If no DTBO files found, check for dtbo.img in out directory
+        if [ $DTBO_FOUND -eq 0 ]; then
+          if [ -f "out/arch/arm64/boot/dtbo.img" ]; then
+            echo "Using pre-built dtbo.img"
+            cp out/arch/arm64/boot/dtbo.img .
+          else
+            echo "No DTBO files found, creating empty dtbo.img"
+            touch dtbo.img
+          fi
+        fi
+        
+        # Copy all images directly to anykernel root directory (NOT in kernel subfolder)
+        cp out/arch/arm64/boot/Image anykernel/
+        cp dtb anykernel/
+        cp dtbo.img anykernel/
+        
+        # Remove kernel subfolder if it exists
+        rm -rf anykernel/kernel/
+        
+        # List contents for verification
+        echo "Files in anykernel root directory:"
+        ls -la anykernel/
+        echo "Image sizes:"
+        ls -lh anykernel/Image anykernel/dtb anykernel/dtbo.img
+
+    - name: Upload Kernel Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-${{ steps.device.outputs.device }}-${{ github.event.inputs.ksu_version }}-${{ github.event.inputs.target_system }}
+        path: |
+          *.zip
+          out/arch/arm64/boot/Image
+          out/arch/arm64/boot/dtb
+          out/arch/arm64/boot/dtbo.img
+        retention-days: 30
+
+    - name: Upload to Telegram
+      if: env.TG_BOT_TOKEN != '' && env.TG_CHAT_ID != ''
+      run: |
+        ZIP_FILE=$(ls *.zip | head -1)
+        curl -F "chat_id=${{ env.TG_CHAT_ID }}" \
+             -F "document=@$ZIP_FILE" \
+             "https://api.telegram.org/bot${{ env.TG_BOT_TOKEN }}/sendDocument"
+      env:
+        TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        TG_CHAT_ID: ${{ secrets.TG_BOT_ID }}
