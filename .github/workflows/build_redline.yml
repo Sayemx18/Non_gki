@@ -354,10 +354,6 @@ jobs:
               echo "SuSFS features disabled"
           fi
           
-          # Force resolve configuration without interaction using olddefconfig
-          echo "Resolving configuration conflicts..."
-          make O=out ARCH=arm64 olddefconfig
-          
           # Debug: Show final KSU configuration
           echo "=== Final KSU Configuration ==="
           echo "KSU_ENABLE: $KSU_ENABLE"
@@ -374,6 +370,8 @@ jobs:
             echo "✗ CONFIG_KSU_MANUAL_HOOK not enabled or not found"
           fi
           echo "=== End KSU Configuration ==="
+
+          make O=out olddefconfig
           
           # Build the kernel
           make O=out \
