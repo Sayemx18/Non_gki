@@ -268,7 +268,7 @@ jobs:
           # Update defconfig with custom version, date and commit ID
           local_version_str="-perf"
           local_version_date_str="-v${{ github.event.inputs.KERNEL_VERSION }}-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
-          sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/vendor/${{ matrix.device }}_defconfig
+          sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${{ matrix.device }}_defconfig
           
           # Build kernel config
           make O=out ${{ matrix.device }}_defconfig
