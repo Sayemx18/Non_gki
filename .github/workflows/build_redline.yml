@@ -215,10 +215,16 @@ jobs:
         # Generate dtb from all dtb files
         find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > dtb
         
-        # Generate dtbo.img from all dtbo files
-        find out/arch/arm64/boot/dts/vendor -name '*.dtbo' -exec cat {} + > dtbo.img 2>/dev/null || echo "No DTBO files found, creating empty dtbo.img"
-        touch dtbo.img  # Ensure file exists even if no DTBOs found
-        
+        # Generate DTBO if available
+          echo "Generating DTBO..."
+          if find out/arch/arm64/boot/dts -name '*.dtbo' | grep -q .; then
+              find out/arch/arm64/boot/dts -name '*.dtbo' | sort | while read file; do
+                  cat "$file" >> out/arch/arm64/boot/dtbo.img
+              done
+              echo "DTBO generated successfully"
+          else
+              echo "No DTBO files found"
+          fi
         # Copy all images to anykernel directory
         cp out/arch/arm64/boot/Image anykernel/
         cp dtb anykernel/
