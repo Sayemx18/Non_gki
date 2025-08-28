@@ -199,19 +199,6 @@ jobs:
           # Clone the original source
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
           
-      - name: Apply Patches
-        run: |
-          cd kernel_tree
-          git submodule deinit -f drivers/kernelsu
-          git rm -f drivers/kernelsu
-          rm -rf .git/modules/drivers/kernelsu
-          git submodule deinit -f KernelSU || true
-          git rm -rf --cached KernelSU || true
-          rm -rf KernelSU
-          rm -rf .git/modules/KernelSU
-          sed -i '/KernelSU/d' .gitmodules || true 
-          
-
       - name: Setup KernelSU
         run: |
           cd kernel_tree
