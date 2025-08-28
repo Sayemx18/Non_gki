@@ -6,12 +6,12 @@ on:
       kernel_source:
         description: 'Kernel Source Repository'
         required: true
-        default: 'https://github.com/your-username/kernel_source.git'
+        default: 'https://github.com/Sayemx18/kernel_xiaomi_sm8250.git'
         type: string
       kernel_branch:
         description: 'Kernel Branch'
         required: true
-        default: 'main'
+        default: 'aosp-16'
         type: string
       target_device:
         description: 'Target Device'
