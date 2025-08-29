@@ -1,4 +1,4 @@
-name: Build Android Kernel
+name: Build faiz
 
 on:
   workflow_dispatch:
@@ -98,6 +98,14 @@ jobs:
           clang \
           lld \
           llvm
+          sudo apt update
+          sudo apt install -y software-properties-common
+          apt policy python2
+          sudo apt install -y python2
+          python2 --version
+          curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+          sudo python2.7 get-pip.py
+          pip2.7 --version
         
         # Set up ccache
         echo "CCACHE_DIR=$HOME/.cache/ccache_mikernel" >> $GITHUB_ENV
@@ -334,8 +342,8 @@ jobs:
         cd ..
         
         echo "Created flashable ZIP: $ZIP_FILENAME"
-      uses: actions/upload-artifact@v4
-      with:
+        uses: actions/upload-artifact@v4
+        with:
         name: kernel-${{ steps.device.outputs.device }}-${{ github.event.inputs.ksu_version }}-${{ github.event.inputs.target_system }}
         path: |
           *.zip
@@ -343,20 +351,6 @@ jobs:
           out/arch/arm64/boot/dtb
           out/arch/arm64/boot/dtbo.img
         retention-days: 30
-
-    - name: Check Telegram Secrets
-      run: |
-        if [ -z "${{ secrets.TG_BOT_TOKEN }}" ]; then
-          echo "❌ TG_BOT_TOKEN is not set"
-        else
-          echo "✅ TG_BOT_TOKEN is set"
-        fi
-        
-        if [ -z "${{ secrets.TG_CHAT_ID }}" ]; then
-          echo "❌ TG_CHAT_ID is not set"
-        else
-          echo "✅ TG_CHAT_ID is set"
-        fi
 
     - name: Upload to Telegram
       if: env.TG_BOT_TOKEN != '' && env.TG_CHAT_ID != ''
