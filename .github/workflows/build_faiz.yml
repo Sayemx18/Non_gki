@@ -184,7 +184,7 @@ jobs:
         # Add date to local version
         local_version_str="-perf"
         local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
-        sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_user_defconfig
+        sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/vendor/${TARGET_DEVICE}_user_defconfig
         
         # Clean previous build
         rm -rf out/
@@ -192,7 +192,7 @@ jobs:
         echo "Building kernel for $TARGET_DEVICE..."
         
         # Make defconfig
-        make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+        make $MAKE_ARGS vendor/${TARGET_DEVICE}_user_defconfig
         
         # Configure KernelSU
         if [ "$KSU_VERSION" != "none" ]; then
