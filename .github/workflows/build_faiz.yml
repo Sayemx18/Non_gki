@@ -64,11 +64,7 @@ on:
           - 'aosp'
           - 'miui'
           - 'both'
-      toolchain_url:
-        description: 'Toolchain URL (Legacy - Not Used)'
-        required: false
-        default: 'https://github.com/kdrag0n/proton-clang/releases/download/20240101/proton-clang-20240101.tar.xz'
-        type: string
+      
 
 jobs:
   build:
