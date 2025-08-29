@@ -1,0 +1,370 @@
+name: Build Android Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_source:
+        description: 'Kernel Source Repository'
+        required: true
+        default: 'https://github.com/your-username/kernel_source.git'
+        type: string
+      kernel_branch:
+        description: 'Kernel Branch'
+        required: true
+        default: 'main'
+        type: string
+      target_device:
+        description: 'Target Device'
+        required: true
+        default: 'lmi'
+        type: choice
+        options:
+          - 'lmi'
+          - 'umi'
+          - 'cmi'
+          - 'cas'
+          - 'apollo'
+          - 'alioth'
+          - 'munch'
+          - 'psyche'
+          - 'diting'
+          - 'marble'
+          - 'custom'
+      custom_device:
+        description: 'Custom Device Name (if "custom" selected above)'
+        required: false
+        type: string
+      ksu_version:
+        description: 'KernelSU Version'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - 'none'
+          - 'ksu'
+          - 'rksu'
+          - 'sukisu'
+          - 'sukisu-ultra'
+      additional_features:
+        description: 'Additional Features'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - 'none'
+          - 'susfs'
+          - 'kpm'
+          - 'susfs-kpm'
+      target_system:
+        description: 'Target System'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - 'aosp'
+          - 'miui'
+          - 'both'
+      toolchain_url:
+        description: 'Toolchain URL (Legacy - Not Used)'
+        required: false
+        default: 'https://github.com/kdrag0n/proton-clang/releases/download/20240101/proton-clang-20240101.tar.xz'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout Kernel Source
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.inputs.kernel_source }}
+        ref: ${{ github.event.inputs.kernel_branch }}
+        fetch-depth: 1
+
+    - name: Setup Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          bc \
+          curl \
+          git \
+          zip \
+          libssl-dev \
+          libfl-dev \
+          python3 \
+          ccache \
+          clang \
+          lld \
+          llvm
+        
+        # Set up ccache
+        echo "CCACHE_DIR=$HOME/.cache/ccache_mikernel" >> $GITHUB_ENV
+        echo "CC=ccache gcc" >> $GITHUB_ENV
+        echo "CXX=ccache g++" >> $GITHUB_ENV
+        echo "/usr/lib/ccache:$PATH" >> $GITHUB_PATH
+
+    - name: Cache Proton Clang
+      uses: actions/cache@v4
+      id: clang-cache
+      with:
+        path: toolchain/proton-clang
+        key: ${{ runner.os }}-proton-clang
+
+    - name: Download Proton Clang Toolchain
+      if: steps.clang-cache.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p toolchain; cd toolchain
+        wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
+        unzip 20210522.zip
+        mv proton-clang-20210522 proton-clang
+        rm proton-clang/bin/ld 20210522.zip
+        
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache_mikernel
+        key: ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-
+
+    - name: Setup Toolchain PATH
+      run: |
+        echo "$PWD/toolchain/proton-clang/bin:$PATH" >> $GITHUB_PATH
+        # Verify toolchain
+        ls -la toolchain/proton-clang/bin/
+
+    - name: Determine Target Device
+      id: device
+      run: |
+        if [ "${{ github.event.inputs.target_device }}" = "custom" ]; then
+          if [ -z "${{ github.event.inputs.custom_device }}" ]; then
+            echo "Error: Custom device name is required when 'custom' is selected"
+            exit 1
+          fi
+          echo "device=${{ github.event.inputs.custom_device }}" >> $GITHUB_OUTPUT
+        else
+          echo "device=${{ github.event.inputs.target_device }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Clone AnyKernel3
+      run: |
+        git clone https://github.com/Sayemx18/AnyKernel3 -b main --single-branch --depth=1 anykernel
+
+    - name: Build Kernel
+      run: |
+        TARGET_DEVICE="${{ steps.device.outputs.device }}"
+        KSU_VERSION="${{ github.event.inputs.ksu_version }}"
+        ADDITIONAL="${{ github.event.inputs.additional_features }}"
+        TARGET_SYSTEM="${{ github.event.inputs.target_system }}"
+        
+        # Check if defconfig exists
+        if [ ! -f "arch/arm64/configs/vendor/${TARGET_DEVICE}_user_defconfig" ]; then
+          echo "Error: No defconfig found for device: ${TARGET_DEVICE}"
+          echo "Available defconfigs:"
+          ls arch/arm64/configs/vendor/*_defconfig || echo "No defconfigs found"
+          exit 1
+        fi
+        
+        # Setup environment variables
+        export CCACHE_DIR="$HOME/.cache/ccache_mikernel" 
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export PATH="/usr/lib/ccache:$PWD/toolchain/proton-clang/bin:$PATH"
+        
+        # Setup build arguments
+        MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+        GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
+        
+        # Add date to local version
+        local_version_str="-perf"
+        local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+        sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_user_defconfig
+        
+        # Clean previous build
+        rm -rf out/
+        
+        echo "Building kernel for $TARGET_DEVICE..."
+        
+        # Make defconfig
+        make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+        
+        # Configure KernelSU
+        if [ "$KSU_VERSION" != "none" ]; then
+          echo "Setting up KernelSU: $KSU_VERSION"
+          
+          if [ "$KSU_VERSION" == "ksu" ]; then
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
+            scripts/config --file out/.config -e KSU
+          elif [ "$KSU_VERSION" == "rksu" ]; then
+            curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+            scripts/config --file out/.config -e KSU
+          elif [ "$KSU_VERSION" == "sukisu" ]; then
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
+            scripts/config --file out/.config -e KSU
+          elif [ "$KSU_VERSION" == "sukisu-ultra" ]; then
+            curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+            scripts/config --file out/.config -e KSU -e KSU_MANUAL_HOOK
+          fi
+        else
+          scripts/config --file out/.config -d KSU
+        fi
+        
+        # Configure additional features
+        if [ "$ADDITIONAL" == "susfs-kmp" ]; then
+          echo "Enabling SuSFS and KPM"
+          scripts/config --file out/.config \
+            -e KPM -e KALLSYMS -e KALLSYMS_ALL \
+            -e KSU_SUSFS -e KSU_SUSFS_HAS_MAGIC_MOUNT -e KSU_SUSFS_SUS_PATH \
+            -e KSU_SUSFS_SUS_MOUNT -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+            -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT -e KSU_SUSFS_SUS_KSTAT \
+            -e KSU_SUSFS_TRY_UMOUNT -e KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
+            -e KSU_SUSFS_SPOOF_UNAME -e KSU_SUSFS_ENABLE_LOG -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+            -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG -e KSU_SUSFS_OPEN_REDIRECT
+        elif [ "$ADDITIONAL" == "susfs" ]; then
+          echo "Enabling SuSFS"
+          scripts/config --file out/.config \
+            -e KSU_SUSFS -e KSU_SUSFS_HAS_MAGIC_MOUNT -e KSU_SUSFS_SUS_PATH \
+            -e KSU_SUSFS_SUS_MOUNT -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+            -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT -e KSU_SUSFS_SUS_KSTAT \
+            -e KSU_SUSFS_TRY_UMOUNT -e KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
+            -e KSU_SUSFS_SPOOF_UNAME -e KSU_SUSFS_ENABLE_LOG -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+            -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG -e KSU_SUSFS_OPEN_REDIRECT
+        elif [ "$ADDITIONAL" == "kpm" ]; then
+          echo "Enabling KPM"
+          scripts/config --file out/.config -e KPM -e KALLSYMS -e KALLSYMS_ALL
+        fi
+        
+        # Build kernel
+        make $MAKE_ARGS -j$(nproc)
+        
+        # Verify build
+        if [ ! -f "out/arch/arm64/boot/Image" ]; then
+          echo "Build failed: Image not found"
+          exit 1
+        fi
+        
+        echo "Kernel build completed successfully"
+
+    - name: Generate DTBO and Package Images
+      run: |
+        cd out/arch/arm64/boot/
+        
+        # Set AnyKernel3 directory path
+        export ANYKERNEL3_DIR="../../../../anykernel"
+        export IMGPATH="$ANYKERNEL3_DIR/Image"
+        export DTBPATH="$ANYKERNEL3_DIR/dtb"
+        export DTBOPATH="$ANYKERNEL3_DIR/dtbo.img"
+        
+        # Generate dtb from all dtb files
+        find dts -name '*.dtb' -exec cat {} + > dtb 2>/dev/null || echo "No DTB files found"
+        
+        # Generate dtbo.img from all dtbo files (check multiple possible locations)
+        DTBO_FOUND=0
+        for dtbo_path in "dts/vendor" "dts" "."; do
+          if find "$dtbo_path" -name "*.dtbo" 2>/dev/null | grep -q .; then
+            echo "Found DTBO files in $dtbo_path"
+            find "$dtbo_path" -name "*.dtbo" -exec cat {} + > dtbo.img
+            DTBO_FOUND=1
+            break
+          fi
+        done
+        
+        # If no DTBO files found, check for pre-built dtbo.img
+        if [ $DTBO_FOUND -eq 0 ]; then
+          if [ -f "dtbo.img" ]; then
+            echo "Using pre-built dtbo.img"
+          else
+            echo "No DTBO files found, creating empty dtbo.img"
+            touch dtbo.img
+          fi
+        fi
+        
+        # Copy files to AnyKernel3 using exported paths
+        if [ -e "Image" ]; then
+          cp -f Image "$IMGPATH"
+        fi
+        
+        if [ -e "dtb" ]; then
+          cp -f dtb "$DTBPATH"
+        fi
+        
+        if [ -e "dtbo.img" ]; then
+          cp -f dtbo.img "$DTBOPATH"
+        fi
+        
+        cd ../../../../
+        
+        # List contents for verification
+        echo "Files copied to anykernel directory:"
+        ls -la "$IMGPATH" "$DTBPATH" "$DTBOPATH" 2>/dev/null || echo "Some files may be missing"
+
+    - name: Create Flashable ZIP
+      run: |
+        cd anykernel
+        GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
+        TARGET_DEVICE="${{ steps.device.outputs.device }}"
+        KSU_VERSION="${{ github.event.inputs.ksu_version }}"
+        TARGET_SYSTEM="${{ github.event.inputs.target_system }}"
+        
+        # Determine KSU string for filename
+        case "$KSU_VERSION" in
+          "ksu") KSU_ZIP_STR="KernelSU" ;;
+          "rksu") KSU_ZIP_STR="RKSU" ;;
+          "sukisu") KSU_ZIP_STR="SukiSU" ;;
+          "sukisu-ultra") KSU_ZIP_STR="SukiSU-Ultra" ;;
+          *) KSU_ZIP_STR="NoKernelSU" ;;
+        esac
+        
+        # Create ZIP filename based on system type
+        if [ "$TARGET_SYSTEM" = "miui" ]; then
+          ZIP_FILENAME="Kernel_MIUI_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
+        elif [ "$TARGET_SYSTEM" = "aosp" ]; then
+          ZIP_FILENAME="Kernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
+        else
+          ZIP_FILENAME="Kernel_Universal_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
+        fi
+        
+        # Create flashable zip
+        zip -r9 "$ZIP_FILENAME" ./* -x .git .gitignore out/ ./*.zip
+        
+        # Move zip to parent directory
+        mv "$ZIP_FILENAME" ../
+        cd ..
+        
+        echo "Created flashable ZIP: $ZIP_FILENAME"
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-${{ steps.device.outputs.device }}-${{ github.event.inputs.ksu_version }}-${{ github.event.inputs.target_system }}
+        path: |
+          *.zip
+          out/arch/arm64/boot/Image
+          out/arch/arm64/boot/dtb
+          out/arch/arm64/boot/dtbo.img
+        retention-days: 30
+
+    - name: Check Telegram Secrets
+      run: |
+        if [ -z "${{ secrets.TG_BOT_TOKEN }}" ]; then
+          echo "❌ TG_BOT_TOKEN is not set"
+        else
+          echo "✅ TG_BOT_TOKEN is set"
+        fi
+        
+        if [ -z "${{ secrets.TG_CHAT_ID }}" ]; then
+          echo "❌ TG_CHAT_ID is not set"
+        else
+          echo "✅ TG_CHAT_ID is set"
+        fi
+
+    - name: Upload to Telegram
+      if: env.TG_BOT_TOKEN != '' && env.TG_CHAT_ID != ''
+      run: |
+        ZIP_FILE=$(ls *.zip | head -1)
+        curl -F "chat_id=${{ env.TG_CHAT_ID }}" \
+             -F "document=@$ZIP_FILE" \
+             "https://api.telegram.org/bot${{ env.TG_BOT_TOKEN }}/sendDocument"
+      env:
+        TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
