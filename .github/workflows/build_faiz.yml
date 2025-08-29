@@ -303,13 +303,51 @@ jobs:
         # List contents for verification
         echo "Files copied to anykernel directory:"
         ls -la "$IMGPATH" "$DTBPATH" "$DTBOPATH" 2>/dev/null || echo "Some files may be missing"
-
-    - name: Upload Kernel Artifacts
+        
+    - name: Create Flashable ZIP
+      run: |
+        cd anykernel
+        GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
+        TARGET_DEVICE="${{ steps.device.outputs.device }}"
+        KSU_VERSION="${{ github.event.inputs.ksu_version }}"
+        TARGET_SYSTEM="${{ github.event.inputs.target_system }}"
+        
+        # Determine KSU string for filename
+        case "$KSU_VERSION" in
+          "ksu") KSU_ZIP_STR="KernelSU" ;;
+          "rksu") KSU_ZIP_STR="RKSU" ;;
+          "sukisu") KSU_ZIP_STR="SukiSU" ;;
+          "sukisu-ultra") KSU_ZIP_STR="SukiSU-Ultra" ;;
+          *) KSU_ZIP_STR="NoKernelSU" ;;
+        esac
+        
+        # Create ZIP filename based on system type
+        if [ "$TARGET_SYSTEM" = "miui" ]; then
+          ZIP_FILENAME="Kernel_MIUI_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
+        elif [ "$TARGET_SYSTEM" = "aosp" ]; then
+          ZIP_FILENAME="Kernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
+        else
+          ZIP_FILENAME="Kernel_Universal_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip"
+        fi
+        
+        # Create flashable zip
+        zip -r9 "$ZIP_FILENAME" ./* -x .git .gitignore out/ ./*.zip
+        
+        # Move zip to parent directory
+        mv "$ZIP_FILENAME" ../
+        cd ..
+        
+        echo "Created flashable ZIP: $ZIP_FILENAME"
+        
+    - name: Upload Artificates
       uses: actions/upload-artifact@v4
       with:
         name: kernel-${{ steps.device.outputs.device }}-${{ github.event.inputs.ksu_version }}-${{ github.event.inputs.target_system }}
         path: |
           *.zip
+          out/arch/arm64/boot/Image
+          out/arch/arm64/boot/dtb
+          out/arch/arm64/boot/dtbo.img
         retention-days: 30
 
     - name: Upload to Telegram
