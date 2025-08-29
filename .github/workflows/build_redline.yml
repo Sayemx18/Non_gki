@@ -164,7 +164,7 @@ jobs:
         TARGET_SYSTEM="${{ github.event.inputs.target_system }}"
         
         # Check if defconfig exists
-        if [ ! -f "arch/arm64/configs/vendor/${TARGET_DEVICE}_user_defconfig" ]; then
+        if [ ! -f "arch/arm64/configs/${TARGET_DEVICE}_defconfig" ]; then
           echo "Error: No defconfig found for device: ${TARGET_DEVICE}"
           echo "Available defconfigs:"
           ls arch/arm64/configs/*_defconfig || echo "No defconfigs found"
@@ -184,7 +184,7 @@ jobs:
         # Add date to local version
         local_version_str="-perf"
         local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
-        sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/vendor/${TARGET_DEVICE}_user_defconfig
+        sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
         
         # Prepare arguments
         BUILD_ARGS="$TARGET_DEVICE"
