@@ -270,7 +270,7 @@ jobs:
         make $MAKE_ARGS -j$(nproc)
         
         # KPM Patch (only for sukisu-ultra with KPM enabled)
-        if [ "$KSU_VERSION" == "sukisu-ultra" ] && [[ "$ADDITIONAL" == "kpm" || "$ADDITIONAL" == "susfs-kmp" ]]; then
+        if [ "$KSU_VERSION" == "sukisu-ultra" ] && [[ "$ADDITIONAL" == "kpm" || "$ADDITIONAL" == "susfs-kpm" ]]; then
           echo "Applying KPM Patch..."
           cd out/arch/arm64/boot
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
