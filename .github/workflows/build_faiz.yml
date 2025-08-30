@@ -64,7 +64,6 @@ on:
           - 'aosp'
           - 'miui'
           - 'both'
-      
 
 jobs:
   build:
@@ -94,14 +93,14 @@ jobs:
           clang \
           lld \
           llvm
-          sudo apt update
-          sudo apt install -y software-properties-common
-          apt policy python2
-          sudo apt install -y python2
-          python2 --version
-          curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
-          sudo python2.7 get-pip.py
-          pip2.7 --version
+        sudo apt update
+        sudo apt install -y software-properties-common
+        apt policy python2
+        sudo apt install -y python2
+        python2 --version
+        curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+        sudo python2.7 get-pip.py
+        pip2.7 --version
         
         # Set up ccache
         echo "CCACHE_DIR=$HOME/.cache/ccache_mikernel" >> $GITHUB_ENV
@@ -201,7 +200,7 @@ jobs:
           if [ "$KSU_VERSION" == "ksu" ]; then
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
           elif [ "$KSU_VERSION" == "rksu" ]; then
-            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kmp" ]; then
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
             else
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
@@ -282,61 +281,60 @@ jobs:
       run: |
         echo "Applying KPM Patch..."
         cd out/arch/arm64/boot
-    
-    # Backup original Image first
+        
+        # Backup original Image first
         cp Image Image.original
-    
-        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+        
+        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
         chmod +x patch
-       ./patch
-    
-       if [ $? -eq 0 ]; then
-         echo "KPM patch applied successfully"
-      # Check if oImage was created and rename it back to Image
-         if [ -f "oImage" ]; then
-           echo "Renaming oImage to Image"
-           rm -f Image
-           mv oImage Image
-         elif [ -f "Image.original" ]; then
-           echo "No oImage found, restoring original Image"
-           mv Image.original Image
-         fi
-       else
-         echo "KPM Patch failed, restoring original Image"
-        if [ -f "Image.original" ]; then
-          mv Image.original Image
+        ./patch
+        
+        if [ $? -eq 0 ]; then
+          echo "KPM patch applied successfully"
+          # Check if oImage was created and rename it back to Image
+          if [ -f "oImage" ]; then
+            echo "Renaming oImage to Image"
+            rm -f Image
+            mv oImage Image
+          elif [ -f "Image.original" ]; then
+            echo "No oImage found, restoring original Image"
+            mv Image.original Image
+          fi
+        else
+          echo "KPM Patch failed, restoring original Image"
+          if [ -f "Image.original" ]; then
+            mv Image.original Image
+          fi
         fi
-      fi
-      cd ../../..
+        cd ../../..
 
     - name: Verify Final Image
       run: |
         # Additional safety check - ensure Image exists
         if [ ! -f "out/arch/arm64/boot/Image" ]; then
           echo "ERROR: Image file missing after KPM patch"
-        # Try to restore from backup or rebuild
-        if [ -f "out/arch/arm64/boot/Image.original" ]; then
-          echo "Restoring from backup Image"
-          mv out/arch/arm64/boot/Image.original out/arch/arm64/boot/Image
-        else
-          echo "No backup available, build failed"
+          # Try to restore from backup or rebuild
+          if [ -f "out/arch/arm64/boot/Image.original" ]; then
+            echo "Restoring from backup Image"
+            mv out/arch/arm64/boot/Image.original out/arch/arm64/boot/Image
+          else
+            echo "No backup available, build failed"
+            exit 1
+          fi
+        fi
+        
+        # Ensure Image exists (even if only oImage was produced)
+        if [ -f "out/arch/arm64/boot/oImage" ]; then
+          mv out/arch/arm64/boot/oImage out/arch/arm64/boot/Image
+        fi
+        
+        # Final verification
+        if [ ! -f "out/arch/arm64/boot/Image" ]; then
+          echo "Build failed: Image not found in final verification"
           exit 1
         fi
-      fi
-    
-       # Ensure Image exists (even if only oImage was produced)
-      if [ -f "out/arch/arm64/boot/oImage" ]; then
-        mv out/arch/arm64/boot/oImage out/arch/arm64/boot/Image
-      fi
-    
-    # Final verification
-      if [ ! -f "out/arch/arm64/boot/Image" ]; then
-        echo "Build failed: Image not found in final verification"
-        exit 1
-      fi
-    
-      echo "Final kernel image verified successfully"
-     
+        
+        echo "Final kernel image verified successfully"
         
     - name: Generate DTBO and Package Images
       run: |
@@ -426,7 +424,7 @@ jobs:
         
         echo "Created flashable ZIP: $ZIP_FILENAME"
         
-    - name: Upload Artificates
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: kernel-${{ steps.device.outputs.device }}-${{ github.event.inputs.ksu_version }}-${{ github.event.inputs.target_system }}
