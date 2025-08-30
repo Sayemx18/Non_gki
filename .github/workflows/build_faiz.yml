@@ -277,13 +277,21 @@ jobs:
           chmod +x patch
           ./patch
           if [ $? -eq 0 ]; then
-            rm -f Image
-            mv oImage Image
             echo "KPM patch applied successfully"
+            # Ensure oImage renamed to Image
+            if [ -f "oImage" ]; then
+              rm -f Image
+              mv oImage Image
+            fi
           else
             echo "KPM Patch failed, using original Image"
           fi
           cd ../../..
+        fi
+        
+        # Ensure Image exists (even if only oImage was produced)
+        if [ -f "out/arch/arm64/boot/oImage" ]; then
+          mv out/arch/arm64/boot/oImage out/arch/arm64/boot/Image
         fi
         
         # Verify build
@@ -293,6 +301,7 @@ jobs:
         fi
         
         echo "Kernel build completed successfully"
+
         
     - name: Generate DTBO and Package Images
       run: |
