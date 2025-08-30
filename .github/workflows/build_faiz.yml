@@ -200,7 +200,7 @@ jobs:
           if [ "$KSU_VERSION" == "ksu" ]; then
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
           elif [ "$KSU_VERSION" == "rksu" ]; then
-            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kmp" ]; then
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
             else
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
@@ -285,7 +285,7 @@ jobs:
         # Backup original Image first
         cp Image Image.original
         
-        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
+        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
         chmod +x patch
         ./patch
         
