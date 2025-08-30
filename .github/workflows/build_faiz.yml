@@ -194,126 +194,125 @@ jobs:
         make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
         
         # Configure KernelSU
-       if [ "$KSU_VERSION" != "none" ]; then
-         echo "Setting up KernelSU: $KSU_VERSION"
-  
-  if [ "$KSU_VERSION" == "ksu" ]; then
-    curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
-  elif [ "$KSU_VERSION" == "rksu" ]; then
-    if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
-      curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
-    else
-      curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
-    fi
-  elif [ "$KSU_VERSION" == "sukisu" ]; then
-    if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
-      curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
-    else
-      curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
-    fi
-  elif [ "$KSU_VERSION" == "sukisu-ultra" ]; then
-    if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
-      curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-    else
-      curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
-    fi
-  fi
-  
-  # Configure ALL KSU options at once before syncconfig
-  echo "Configuring KernelSU options non-interactively..."
-  
-  # Enable KSU
-  scripts/config --file out/.config -e KSU
-  
-  # Set default values for KSU options
-  scripts/config --file out/.config -d KSU_DEBUG
-  scripts/config --file out/.config -d KSU_ALLOWLIST_WORKAROUND
-  scripts/config --file out/.config -d KSU_CMDLINE
-  scripts/config --file out/.config -d KSU_LSM_SECURITY_HOOKS
-  
-  # Hook type configuration
-  if [ "$KSU_VERSION" == "sukisu-ultra" ]; then
-    scripts/config --file out/.config -e KSU_MANUAL_HOOK
-    scripts/config --file out/.config -d KSU_TRACEPOINT_HOOK
-  else
-    scripts/config --file out/.config -d KSU_MANUAL_HOOK
-    scripts/config --file out/.config -e KSU_TRACEPOINT_HOOK
-  fi
-  
-  # Configure KPM based on additional features (THIS IS THE KEY FIX)
-  if [ "$ADDITIONAL" == "kpm" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
-    echo "Enabling KPM"
-    scripts/config --file out/.config -e KPM
-    scripts/config --file out/.config -e KALLSYMS
-    scripts/config --file out/.config -e KALLSYMS_ALL
-  else
-    scripts/config --file out/.config -d KPM
-    scripts/config --file out/.config -d KALLSYMS
-    scripts/config --file out/.config -d KALLSYMS_ALL
-  fi
-  
-  # Configure SuSFS if needed
-  if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
-    echo "Enabling SuSFS"
-    scripts/config --file out/.config -e KSU_SUSFS
-    scripts/config --file out/.config -e KSU_SUSFS_HAS_MAGIC_MOUNT
-    scripts/config --file out/.config -e KSU_SUSFS_SUS_PATH
-    scripts/config --file out/.config -e KSU_SUSFS_SUS_MOUNT
-    scripts/config --file out/.config -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-    scripts/config --file out/.config -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-    scripts/config --file out/.config -e KSU_SUSFS_SUS_KSTAT
-    scripts/config --file out/.config -e KSU_SUSFS_TRY_UMOUNT
-    scripts/config --file out/.config -e KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-    scripts/config --file out/.config -e KSU_SUSFS_SPOOF_UNAME
-    scripts/config --file out/.config -e KSU_SUSFS_ENABLE_LOG
-    scripts/config --file out/.config -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-    scripts/config --file out/.config -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-    scripts/config --file out/.config -e KSU_SUSFS_OPEN_REDIRECT
-  else
-    # Disable all SuSFS options
-    scripts/config --file out/.config -d KSU_SUSFS
-    scripts/config --file out/.config -d KSU_SUSFS_HAS_MAGIC_MOUNT
-    scripts/config --file out/.config -d KSU_SUSFS_SUS_PATH
-    scripts/config --file out/.config -d KSU_SUSFS_SUS_MOUNT
-    scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-    scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-    scripts/config --file out/.config -d KSU_SUSFS_SUS_KSTAT
-    scripts/config --file out/.config -d KSU_SUSFS_TRY_UMOUNT
-    scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-    scripts/config --file out/.config -d KSU_SUSFS_SPOOF_UNAME
-    scripts/config --file out/.config -d KSU_SUSFS_ENABLE_LOG
-    scripts/config --file out/.config -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-    scripts/config --file out/.config -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-    scripts/config --file out/.config -d KSU_SUSFS_OPEN_REDIRECT
-  fi
-  
-else
-  # No KSU - disable all related features
-  echo "Disabling all KSU features"
-  scripts/config --file out/.config -d KSU
-  scripts/config --file out/.config -d KPM
-  scripts/config --file out/.config -d KALLSYMS
-  scripts/config --file out/.config -d KALLSYMS_ALL
-  # Disable all SuSFS options
-  scripts/config --file out/.config -d KSU_SUSFS
-  scripts/config --file out/.config -d KSU_SUSFS_HAS_MAGIC_MOUNT
-  scripts/config --file out/.config -d KSU_SUSFS_SUS_PATH
-  scripts/config --file out/.config -d KSU_SUSFS_SUS_MOUNT
-  scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-  scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-  scripts/config --file out/.config -d KSU_SUSFS_SUS_KSTAT
-  scripts/config --file out/.config -d KSU_SUSFS_TRY_UMOUNT
-  scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-  scripts/config --file out/.config -d KSU_SUSFS_SPOOF_UNAME
-  scripts/config --file out/.config -d KSU_SUSFS_ENABLE_LOG
-  scripts/config --file out/.config -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-  scripts/config --file out/.config -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-  scripts/config --file out/.config -d KSU_SUSFS_OPEN_REDIRECT
-fi
+        if [ "$KSU_VERSION" != "none" ]; then
+          echo "Setting up KernelSU: $KSU_VERSION"
+          
+          if [ "$KSU_VERSION" == "ksu" ]; then
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
+          elif [ "$KSU_VERSION" == "rksu" ]; then
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
+            else
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+            fi
+          elif [ "$KSU_VERSION" == "sukisu" ]; then
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kmp" ]; then
+              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
+            else
+              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
+            fi
+          elif [ "$KSU_VERSION" == "sukisu-ultra" ]; then
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+            else
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+            fi
+          fi
+          
+          # Configure ALL KSU options at once before syncconfig
+          echo "Configuring KernelSU options non-interactively..."
+          
+          # Enable KSU
+          scripts/config --file out/.config -e KSU
+          
+          # Set default values for KSU options
+          scripts/config --file out/.config -d KSU_DEBUG
+          scripts/config --file out/.config -d KSU_ALLOWLIST_WORKAROUND
+          scripts/config --file out/.config -d KSU_CMDLINE
+          scripts/config --file out/.config -d KSU_LSM_SECURITY_HOOKS
+          
+          # Hook type configuration
+          if [ "$KSU_VERSION" == "sukisu-ultra" ]; then
+            scripts/config --file out/.config -e KSU_MANUAL_HOOK
+            scripts/config --file out/.config -d KSU_TRACEPOINT_HOOK
+          else
+            scripts/config --file out/.config -d KSU_MANUAL_HOOK
+            scripts/config --file out/.config -e KSU_TRACEPOINT_HOOK
+          fi
+          
+          # Configure KPM based on additional features (THIS IS THE KEY FIX)
+          if [ "$ADDITIONAL" == "kpm" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+            echo "Enabling KPM"
+            scripts/config --file out/.config -e KPM
+            scripts/config --file out/.config -e KALLSYMS
+            scripts/config --file out/.config -e KALLSYMS_ALL
+          else
+            scripts/config --file out/.config -d KPM
+            scripts/config --file out/.config -d KALLSYMS
+            scripts/config --file out/.config -d KALLSYMS_ALL
+          fi
+          
+          # Configure SuSFS if needed
+          if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+            echo "Enabling SuSFS"
+            scripts/config --file out/.config -e KSU_SUSFS
+            scripts/config --file out/.config -e KSU_SUSFS_HAS_MAGIC_MOUNT
+            scripts/config --file out/.config -e KSU_SUSFS_SUS_PATH
+            scripts/config --file out/.config -e KSU_SUSFS_SUS_MOUNT
+            scripts/config --file out/.config -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
+            scripts/config --file out/.config -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
+            scripts/config --file out/.config -e KSU_SUSFS_SUS_KSTAT
+            scripts/config --file out/.config -e KSU_SUSFS_TRY_UMOUNT
+            scripts/config --file out/.config -e KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
+            scripts/config --file out/.config -e KSU_SUSFS_SPOOF_UNAME
+            scripts/config --file out/.config -e KSU_SUSFS_ENABLE_LOG
+            scripts/config --file out/.config -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+            scripts/config --file out/.config -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+            scripts/config --file out/.config -e KSU_SUSFS_OPEN_REDIRECT
+          else
+            # Disable all SuSFS options
+            scripts/config --file out/.config -d KSU_SUSFS
+            scripts/config --file out/.config -d KSU_SUSFS_HAS_MAGIC_MOUNT
+            scripts/config --file out/.config -d KSU_SUSFS_SUS_PATH
+            scripts/config --file out/.config -d KSU_SUSFS_SUS_MOUNT
+            scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
+            scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
+            scripts/config --file out/.config -d KSU_SUSFS_SUS_KSTAT
+            scripts/config --file out/.config -d KSU_SUSFS_TRY_UMOUNT
+            scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
+            scripts/config --file out/.config -d KSU_SUSFS_SPOOF_UNAME
+            scripts/config --file out/.config -d KSU_SUSFS_ENABLE_LOG
+            scripts/config --file out/.config -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+            scripts/config --file out/.config -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+            scripts/config --file out/.config -d KSU_SUSFS_OPEN_REDIRECT
+          fi
+        else
+          # No KSU - disable all related features
+          echo "Disabling all KSU features"
+          scripts/config --file out/.config -d KSU
+          scripts/config --file out/.config -d KPM
+          scripts/config --file out/.config -d KALLSYMS
+          scripts/config --file out/.config -d KALLSYMS_ALL
+          # Disable all SuSFS options
+          scripts/config --file out/.config -d KSU_SUSFS
+          scripts/config --file out/.config -d KSU_SUSFS_HAS_MAGIC_MOUNT
+          scripts/config --file out/.config -d KSU_SUSFS_SUS_PATH
+          scripts/config --file out/.config -d KSU_SUSFS_SUS_MOUNT
+          scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
+          scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
+          scripts/config --file out/.config -d KSU_SUSFS_SUS_KSTAT
+          scripts/config --file out/.config -d KSU_SUSFS_TRY_UMOUNT
+          scripts/config --file out/.config -d KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
+          scripts/config --file out/.config -d KSU_SUSFS_SPOOF_UNAME
+          scripts/config --file out/.config -d KSU_SUSFS_ENABLE_LOG
+          scripts/config --file out/.config -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+          scripts/config --file out/.config -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+          scripts/config --file out/.config -d KSU_SUSFS_OPEN_REDIRECT
+        fi
 
-# Run syncconfig non-interactively (ONCE, after all config changes)
-echo "Running syncconfig..."
-make $MAKE_ARGS syncconfig </dev/null
+        # Run syncconfig non-interactively (ONCE, after all config changes)
+        echo "Running syncconfig..."
+        make $MAKE_ARGS syncconfig </dev/null
         
         # Build kernel
         make $MAKE_ARGS -j$(nproc)
@@ -335,7 +334,7 @@ make $MAKE_ARGS syncconfig </dev/null
         # Backup original Image first
         cp Image Image.original
         
-        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
         chmod +x patch
         ./patch
         
