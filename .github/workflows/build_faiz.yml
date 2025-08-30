@@ -269,13 +269,13 @@ jobs:
         # Build kernel
         make $MAKE_ARGS -j$(nproc)
         
-         # Verify initial build
-         if [ ! -f "out/arch/arm64/boot/Image" ]; then
-            echo "Build failed: Image not found after initial build"
-            exit 1
-          fi
-    
-          echo "Kernel build completed successfully"
+        # Verify initial build
+        if [ ! -f "out/arch/arm64/boot/Image" ]; then
+          echo "Build failed: Image not found after initial build"
+          exit 1
+        fi
+        
+        echo "Kernel build completed successfully"
 
     - name: Apply KPM Patch
       if: ${{ github.event.inputs.ksu_version == 'sukisu-ultra' && (github.event.inputs.additional_features == 'kpm' || github.event.inputs.additional_features == 'susfs-kpm') }}
