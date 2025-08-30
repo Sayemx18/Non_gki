@@ -206,7 +206,7 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
             fi
           elif [ "$KSU_VERSION" == "sukisu" ]; then
-            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kmp" ]; then
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
               curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
             else
               curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
@@ -334,7 +334,7 @@ jobs:
         # Backup original Image first
         cp Image Image.original
         
-        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
+        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
         chmod +x patch
         ./patch
         
