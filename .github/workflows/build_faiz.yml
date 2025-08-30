@@ -200,23 +200,39 @@ jobs:
           
           if [ "$KSU_VERSION" == "ksu" ]; then
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
-            scripts/config --file out/.config -e KSU
           elif [ "$KSU_VERSION" == "rksu" ]; then
-            curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
-            scripts/config --file out/.config -e KSU
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
+            else
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+            fi
           elif [ "$KSU_VERSION" == "sukisu" ]; then
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
-            scripts/config --file out/.config -e KSU
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
+            else
+              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
+            fi
           elif [ "$KSU_VERSION" == "sukisu-ultra" ]; then
-            curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
-            scripts/config --file out/.config -e KSU -e KSU_MANUAL_HOOK
+            if [ "$ADDITIONAL" == "susfs" ] || [ "$ADDITIONAL" == "susfs-kpm" ]; then
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+            else
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+            fi
+          fi
+          
+          # Configure KSU in kernel config
+          scripts/config --file out/.config -e KSU
+          
+          # Enable manual hook for sukisu-ultra
+          if [ "$KSU_VERSION" == "sukisu-ultra" ]; then
+            scripts/config --file out/.config -e KSU_MANUAL_HOOK
           fi
         else
           scripts/config --file out/.config -d KSU
         fi
         
         # Configure additional features
-        if [ "$ADDITIONAL" == "susfs-kmp" ]; then
+        if [ "$ADDITIONAL" == "susfs-kpm" ]; then
           echo "Enabling SuSFS and KPM"
           scripts/config --file out/.config \
             -e KPM -e KALLSYMS -e KALLSYMS_ALL \
@@ -238,10 +254,37 @@ jobs:
         elif [ "$ADDITIONAL" == "kpm" ]; then
           echo "Enabling KPM"
           scripts/config --file out/.config -e KPM -e KALLSYMS -e KALLSYMS_ALL
+        else
+          # Disable features when none selected
+          scripts/config --file out/.config \
+            -d KPM -d KALLSYMS -d KALLSYMS_ALL \
+            -d KSU_SUSFS -d KSU_SUSFS_HAS_MAGIC_MOUNT -d KSU_SUSFS_SUS_PATH \
+            -d KSU_SUSFS_SUS_MOUNT -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+            -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT -d KSU_SUSFS_SUS_KSTAT \
+            -d KSU_SUSFS_TRY_UMOUNT -d KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
+            -d KSU_SUSFS_SPOOF_UNAME -d KSU_SUSFS_ENABLE_LOG -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+            -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG -d KSU_SUSFS_OPEN_REDIRECT
         fi
         
         # Build kernel
         make $MAKE_ARGS -j$(nproc)
+        
+        # KPM Patch (only for sukisu-ultra with KPM enabled)
+        if [ "$KSU_VERSION" == "sukisu-ultra" ] && [[ "$ADDITIONAL" == "kpm" || "$ADDITIONAL" == "susfs-kmp" ]]; then
+          echo "Applying KPM Patch..."
+          cd out/arch/arm64/boot
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod +x patch
+          ./patch
+          if [ $? -eq 0 ]; then
+            rm -f Image
+            mv oImage Image
+            echo "KPM patch applied successfully"
+          else
+            echo "KPM Patch failed, using original Image"
+          fi
+          cd ../../..
+        fi
         
         # Verify build
         if [ ! -f "out/arch/arm64/boot/Image" ]; then
@@ -250,7 +293,7 @@ jobs:
         fi
         
         echo "Kernel build completed successfully"
-
+        
     - name: Generate DTBO and Package Images
       run: |
         cd out/arch/arm64/boot/
