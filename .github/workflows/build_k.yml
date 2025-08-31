@@ -178,7 +178,6 @@ jobs:
       - name: Clone kernel source 
         id: kernel
         run: |
-          # Clone the original source
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
 
       - name: Setup KernelSU
@@ -229,7 +228,7 @@ jobs:
               ;;
           esac
 
-      - name: Apply SuSFS Patches (Conditional)
+      - name: Apply SuSFS Patches
         run: |
           cd kernel_tree
           if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
@@ -239,36 +238,32 @@ jobs:
             git remote add fork https://github.com/Impqxr/kernel_xiaomi_sm8250.git
             git fetch fork susfs-v1.5.5 --depth=10
             
-            # Check what the commit contains
             echo "Checking cherry-pick commit..."
             git show --name-only a50639ef2a4b2beec61575b713369f860c2f6252 || echo "Could not show commit details"
             
-            # Apply the patch
             git cherry-pick a50639ef2a4b2beec61575b713369f860c2f6252
             
             # Re-add KSU config if it was removed by the patch
             if ! grep -q "config KSU" arch/arm64/Kconfig; then
               echo "Re-adding KSU config to arch/arm64/Kconfig"
-              cat >> arch/arm64/Kconfig << 'EOF'
-
-config KSU
-	tristate "KernelSU function support"
-	select OVERLAY_FS
-	default y
-	help
-	  Enable kernel-level root privileges on Android System.
-
-config KSU_MANUAL_HOOK
-	bool "KernelSU manual hook"
-	depends on KSU
-	default y
-	help
-	  Enable KernelSU manual hook support.
-
-EOF
-              echo "✓ KSU config re-added"
+              echo "" >> arch/arm64/Kconfig
+              echo "config KSU" >> arch/arm64/Kconfig
+              echo "	tristate \"KernelSU function support\"" >> arch/arm64/Kconfig
+              echo "	select OVERLAY_FS" >> arch/arm64/Kconfig
+              echo "	default y" >> arch/arm64/Kconfig
+              echo "	help" >> arch/arm64/Kconfig
+              echo "	  Enable kernel-level root privileges on Android System." >> arch/arm64/Kconfig
+              echo "" >> arch/arm64/Kconfig
+              echo "config KSU_MANUAL_HOOK" >> arch/arm64/Kconfig
+              echo "	bool \"KernelSU manual hook\"" >> arch/arm64/Kconfig
+              echo "	depends on KSU" >> arch/arm64/Kconfig
+              echo "	default y" >> arch/arm64/Kconfig
+              echo "	help" >> arch/arm64/Kconfig
+              echo "	  Enable KernelSU manual hook support." >> arch/arm64/Kconfig
+              echo "" >> arch/arm64/Kconfig
+              echo "KSU config re-added"
             else
-              echo "✓ KSU config already exists"
+              echo "KSU config already exists"
             fi
             
             echo "SuSFS patches applied successfully"
@@ -276,50 +271,18 @@ EOF
             echo "SuSFS not enabled, skipping patches"
           fi
 
-      - name: Fix Kconfig References
-        run: |
-          cd kernel_tree
-          if [[ "$KSU_ENABLE" -eq 1 ]]; then
-            echo "=== Fixing Kconfig References ==="
-            
-            # Find and remove any drivers/kernelsu references from Kconfig files
-            echo "Searching for drivers/kernelsu references..."
-            if grep -r "drivers/kernelsu" . --include="Kconfig*" 2>/dev/null; then
-              echo "Found drivers/kernelsu references, removing them..."
-              
-              # Remove drivers/kernelsu source lines from Kconfig files
-              find . -name "Kconfig*" -type f -exec grep -l "drivers/kernelsu" {} \; | while read file; do
-                echo "Fixing $file"
-                sed -i '/source.*drivers\/kernelsu/d' "$file"
-              done
-              
-              echo "✓ Removed drivers/kernelsu references from Kconfig files"
-            else
-              echo "✓ No drivers/kernelsu references found in Kconfig files"
-            fi
-            
-            # Check if KSU config options are available elsewhere
-            echo "Checking for KSU config definitions..."
-            if grep -r "config KSU" . --include="Kconfig*" --exclude-dir="drivers/kernelsu" 2>/dev/null; then
-              echo "✓ Found KSU config definitions"
-            else
-              echo "⚠ No KSU config definitions found - KSU configs will be skipped"
-            fi
-          fi
+      - name: Detect and Configure SuSFS
         run: |
           cd kernel_tree
           if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
             echo "=== SuSFS Configuration ==="
             
-            # Detect SuSFS version from build log first
             SUSFS_VERSION=$(grep -oP '(?<=-- SUSFS_VERSION: )v[\d.]+' build.log 2>/dev/null || echo "")
             
-            # Fallback: get version from susfs.h header
             if [[ -z "$SUSFS_VERSION" && -f include/linux/susfs.h ]]; then
               SUSFS_VERSION=$(grep -Po '^#define\s+SUSFS_VERSION\s+"\Kv[0-9]+(?:\.[0-9]+)*' include/linux/susfs.h 2>/dev/null || echo "v1.5.5")
             fi
             
-            # Final fallback
             if [[ -z "$SUSFS_VERSION" ]]; then
               SUSFS_VERSION="v1.5.5"
             fi
@@ -327,11 +290,9 @@ EOF
             echo "SuSFS Version: $SUSFS_VERSION"
             echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
             
-            # Check SuSFS header
             if [[ -f "include/linux/susfs.h" ]]; then
               echo "✓ SuSFS header found at include/linux/susfs.h"
               
-              # Check for required CMD definitions
               CMD_COUNT=$(grep -c "CMD_SUSFS_" include/linux/susfs.h 2>/dev/null || echo "0")
               echo "Found $CMD_COUNT SuSFS command definitions"
               
@@ -358,53 +319,36 @@ EOF
           export SUBARCH=ARM64
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           
-          # Setup ccache
           export CCACHE_DIR="$HOME/.cache/ccache"
           export CC="ccache clang"
           export CXX="ccache clang++"
           
           cd kernel_tree
           
-          # Get git commit info
           GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
           echo "GIT_COMMIT_ID=$GIT_COMMIT_ID" >> $GITHUB_ENV
           
-          # Update defconfig with custom version, date and commit ID
           local_version_str="-perf"
           local_version_date_str="-v${{ github.event.inputs.KERNEL_VERSION }}-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
           sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/vendor/${{ matrix.device }}_defconfig
           
-          # Build kernel config
           make O=out vendor/${{ matrix.device }}_defconfig
           
-          # Configure KSU with MANUAL_HOOK (no KernelSU directory needed)
           if [ "$KSU_ENABLE" -eq 1 ]; then
-              # First, check if CONFIG_KSU exists in Kconfig
-              if grep -r "config KSU" arch/*/Kconfig* drivers/*/Kconfig* 2>/dev/null | grep -v drivers/kernelsu; then
-                scripts/config --file out/.config -e KSU
-                echo "✓ KSU enabled in config"
-              else
-                echo "⚠ CONFIG_KSU not found in Kconfig files, skipping KSU config"
-              fi
+              scripts/config --file out/.config -e KSU
+              echo "✓ KSU enabled in config"
           else
-              scripts/config --file out/.config -d KSU 2>/dev/null || true
+              scripts/config --file out/.config -d KSU
               echo "KSU disabled in config"
           fi
 
-          # Enable KSU_MANUAL_HOOK (this is what handles KSU without directories)
           if [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "rksu" ]] || [[ "$KSU_ENABLE" -eq 1 ]]; then
-              # Check if KSU_MANUAL_HOOK exists in Kconfig
-              if grep -r "config KSU_MANUAL_HOOK" arch/*/Kconfig* drivers/*/Kconfig* 2>/dev/null | grep -v drivers/kernelsu; then
-                scripts/config --file out/.config -e KSU_MANUAL_HOOK
-                echo "✓ KSU_MANUAL_HOOK enabled"
-              else
-                echo "⚠ CONFIG_KSU_MANUAL_HOOK not found in Kconfig files, skipping"
-              fi
+              scripts/config --file out/.config -e KSU_MANUAL_HOOK
+              echo "✓ KSU_MANUAL_HOOK enabled"
           else
               echo "KSU_MANUAL_HOOK not needed for ${{ github.event.inputs.KSU_VERSION }}"
           fi
 
-          # Configure SuSFS
           if [ "$SuSFS_ENABLE" -eq 1 ]; then
               echo "Enabling SuSFS configuration..."
               scripts/config --file out/.config \
@@ -442,7 +386,6 @@ EOF
               echo "SuSFS features disabled"
           fi
           
-          # Debug: Show final configuration
           echo "=== Final Build Configuration ==="
           echo "KSU_ENABLE: $KSU_ENABLE"
           echo "SuSFS_ENABLE: $SuSFS_ENABLE"
@@ -467,7 +410,6 @@ EOF
           fi
           echo "=== End Configuration ==="
           
-          # Build the kernel
           echo "Starting kernel build..."
           make O=out \
             ARCH=arm64 \
@@ -486,7 +428,6 @@ EOF
         run: |
           cd kernel_tree
           
-          # Check if build was successful
           if [ -f "out/arch/arm64/boot/Image.gz" ]; then
               echo "✓ Build successful: Image.gz found"
               ls -lh out/arch/arm64/boot/Image.gz
