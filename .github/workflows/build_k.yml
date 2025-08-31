@@ -292,13 +292,6 @@ jobs:
               find include/ -name "*susfs*" -o -name "*ksu*" 2>/dev/null || echo "No SuSFS/KSU headers found"
               exit 1
             fi
-            
-            # Verify KernelSU installation
-            if [[ -d "KernelSU" ]]; then
-              echo "✓ KernelSU directory found"
-            else
-              echo "⚠ Warning: KernelSU/ directory not found"
-            fi
           else
             echo "SuSFS disabled, skipping configuration"
           fi
@@ -329,31 +322,19 @@ jobs:
           # Build kernel config
           make O=out vendor/${{ matrix.device }}_defconfig
           
-          # Configure KSU
+          # Configure KSU with MANUAL_HOOK (no KernelSU directory needed)
           if [ "$KSU_ENABLE" -eq 1 ]; then
-              # Check if KernelSU was properly set up
-              if [[ -f "KernelSU/kernel/Kconfig" ]] || [[ -d "KernelSU" ]]; then
-                  scripts/config --file out/.config -e KSU
-                  echo "✓ KSU enabled in config"
-              else
-                  echo "Warning: KernelSU files not found, disabling KSU"
-                  scripts/config --file out/.config -d KSU
-                  echo "KSU disabled due to missing files"
-              fi
+              scripts/config --file out/.config -e KSU
+              echo "✓ KSU enabled in config"
           else
               scripts/config --file out/.config -d KSU
               echo "KSU disabled in config"
           fi
 
-          # Enable KSU_MANUAL_HOOK for sukisu-ultra and other KSU variants
+          # Enable KSU_MANUAL_HOOK (this is what handles KSU without directories)
           if [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "rksu" ]] || [[ "$KSU_ENABLE" -eq 1 ]]; then
-              # Only enable if KSU was properly set up
-              if [[ -f "KernelSU/kernel/Kconfig" ]] || [[ -d "KernelSU" ]]; then
-                  scripts/config --file out/.config -e KSU_MANUAL_HOOK
-                  echo "✓ KSU_MANUAL_HOOK enabled"
-              else
-                  echo "Warning: KernelSU not properly set up, skipping KSU_MANUAL_HOOK"
-              fi
+              scripts/config --file out/.config -e KSU_MANUAL_HOOK
+              echo "✓ KSU_MANUAL_HOOK enabled"
           else
               echo "KSU_MANUAL_HOOK not needed for ${{ github.event.inputs.KSU_VERSION }}"
           fi
