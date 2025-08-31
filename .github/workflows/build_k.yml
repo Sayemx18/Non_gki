@@ -180,19 +180,7 @@ jobs:
         run: |
           # Clone the original source
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
-          
-      - name: Apply Patches
-        run: |
-          cd kernel_tree
-          git submodule deinit -f drivers/kernelsu
-          git rm -f drivers/kernelsu
-          rm -rf .git/modules/drivers/kernelsu
-          git submodule deinit -f KernelSU || true
-          git rm -rf --cached KernelSU || true
-          rm -rf KernelSU
-          rm -rf .git/modules/KernelSU
-          sed -i '/KernelSU/d' .gitmodules || true 
-          
+
       - name: Setup KernelSU
         run: |
           cd kernel_tree
@@ -240,6 +228,80 @@ jobs:
               echo "KernelSU is disabled"
               ;;
           esac
+
+      - name: Apply SuSFS Patches (Conditional)
+        run: |
+          cd kernel_tree
+          if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+            echo "Applying SuSFS patches..."
+            git config --global user.email "action@github.com"
+            git config --global user.name "GitHub Action"
+            git remote add fork https://github.com/Impqxr/kernel_xiaomi_sm8250.git
+            git fetch fork susfs-v1.5.5 --depth=10
+            
+            # Check what the commit contains
+            echo "Checking cherry-pick commit..."
+            git show --name-only a50639ef2a4b2beec61575b713369f860c2f6252 || echo "Could not show commit details"
+            
+            # Apply the patch
+            git cherry-pick a50639ef2a4b2beec61575b713369f860c2f6252
+            echo "SuSFS patches applied successfully"
+          else
+            echo "SuSFS not enabled, skipping patches"
+          fi
+
+      - name: Detect and Configure SuSFS
+        run: |
+          cd kernel_tree
+          if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+            echo "=== SuSFS Configuration ==="
+            
+            # Detect SuSFS version from build log first
+            SUSFS_VERSION=$(grep -oP '(?<=-- SUSFS_VERSION: )v[\d.]+' build.log 2>/dev/null || echo "")
+            
+            # Fallback: get version from susfs.h header
+            if [[ -z "$SUSFS_VERSION" && -f include/linux/susfs.h ]]; then
+              SUSFS_VERSION=$(grep -Po '^#define\s+SUSFS_VERSION\s+"\Kv[0-9]+(?:\.[0-9]+)*' include/linux/susfs.h 2>/dev/null || echo "v1.5.5")
+            fi
+            
+            # Final fallback
+            if [[ -z "$SUSFS_VERSION" ]]; then
+              SUSFS_VERSION="v1.5.5"
+            fi
+            
+            echo "SuSFS Version: $SUSFS_VERSION"
+            echo "SUSFS_VERSION=$SUSFS_VERSION" >> $GITHUB_ENV
+            
+            # Check SuSFS header
+            if [[ -f "include/linux/susfs.h" ]]; then
+              echo "✓ SuSFS header found at include/linux/susfs.h"
+              
+              # Check for required CMD definitions
+              CMD_COUNT=$(grep -c "CMD_SUSFS_" include/linux/susfs.h 2>/dev/null || echo "0")
+              echo "Found $CMD_COUNT SuSFS command definitions"
+              
+              if [[ "$CMD_COUNT" -gt 0 ]]; then
+                echo "✓ SuSFS commands found in header"
+                grep -E "CMD_SUSFS_.*=" include/linux/susfs.h | head -3 || echo "Could not display commands"
+              else
+                echo "⚠ Warning: No SuSFS commands found in header"
+              fi
+            else
+              echo "✗ ERROR: SuSFS header NOT found at include/linux/susfs.h"
+              echo "This will cause build failures. Checking available files..."
+              find include/ -name "*susfs*" -o -name "*ksu*" 2>/dev/null || echo "No SuSFS/KSU headers found"
+              exit 1
+            fi
+            
+            # Verify KernelSU installation
+            if [[ -d "KernelSU" ]]; then
+              echo "✓ KernelSU directory found"
+            else
+              echo "⚠ Warning: KernelSU/ directory not found"
+            fi
+          else
+            echo "SuSFS disabled, skipping configuration"
+          fi
           
       - name: Build Kernel
         run: |
@@ -269,10 +331,10 @@ jobs:
           
           # Configure KSU
           if [ "$KSU_ENABLE" -eq 1 ]; then
-              # Check if KernelSU was properly set up before enabling it
-              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+              # Check if KernelSU was properly set up
+              if [[ -f "KernelSU/kernel/Kconfig" ]] || [[ -d "KernelSU" ]]; then
                   scripts/config --file out/.config -e KSU
-                  echo "KSU enabled in config"
+                  echo "✓ KSU enabled in config"
               else
                   echo "Warning: KernelSU files not found, disabling KSU"
                   scripts/config --file out/.config -d KSU
@@ -286,9 +348,9 @@ jobs:
           # Enable KSU_MANUAL_HOOK for sukisu-ultra and other KSU variants
           if [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "rksu" ]] || [[ "$KSU_ENABLE" -eq 1 ]]; then
               # Only enable if KSU was properly set up
-              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+              if [[ -f "KernelSU/kernel/Kconfig" ]] || [[ -d "KernelSU" ]]; then
                   scripts/config --file out/.config -e KSU_MANUAL_HOOK
-                  echo "KSU_MANUAL_HOOK enabled"
+                  echo "✓ KSU_MANUAL_HOOK enabled"
               else
                   echo "Warning: KernelSU not properly set up, skipping KSU_MANUAL_HOOK"
               fi
@@ -298,6 +360,7 @@ jobs:
 
           # Configure SuSFS
           if [ "$SuSFS_ENABLE" -eq 1 ]; then
+              echo "Enabling SuSFS configuration..."
               scripts/config --file out/.config \
                   -e KSU_SUSFS \
                   -e KSU_SUSFS_HAS_MAGIC_MOUNT \
@@ -313,7 +376,7 @@ jobs:
                   -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
                   -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
                   -e KSU_SUSFS_OPEN_REDIRECT
-              echo "SuSFS features enabled"
+              echo "✓ SuSFS features enabled"
           else
               scripts/config --file out/.config \
                   -d KSU_SUSFS \
@@ -333,24 +396,33 @@ jobs:
               echo "SuSFS features disabled"
           fi
           
-          # Debug: Show final KSU configuration
-          echo "=== Final KSU Configuration ==="
+          # Debug: Show final configuration
+          echo "=== Final Build Configuration ==="
           echo "KSU_ENABLE: $KSU_ENABLE"
+          echo "SuSFS_ENABLE: $SuSFS_ENABLE"
           echo "KSU_VERSION: ${{ github.event.inputs.KSU_VERSION }}"
-          echo "Checking KSU config options in .config:"
+          echo "SUSFS_VERSION: ${SUSFS_VERSION:-Not Set}"
+          
+          echo "Checking config options:"
           if grep -q "CONFIG_KSU=y" out/.config 2>/dev/null; then
             echo "✓ CONFIG_KSU=y found"
           else
-            echo "✗ CONFIG_KSU not enabled or not found"
+            echo "✗ CONFIG_KSU not enabled"
           fi
           if grep -q "CONFIG_KSU_MANUAL_HOOK=y" out/.config 2>/dev/null; then
             echo "✓ CONFIG_KSU_MANUAL_HOOK=y found"
           else
-            echo "✗ CONFIG_KSU_MANUAL_HOOK not enabled or not found"
+            echo "✗ CONFIG_KSU_MANUAL_HOOK not enabled"
           fi
-          echo "=== End KSU Configuration ==="
+          if grep -q "CONFIG_KSU_SUSFS=y" out/.config 2>/dev/null; then
+            echo "✓ CONFIG_KSU_SUSFS=y found"
+          else
+            echo "✗ CONFIG_KSU_SUSFS not enabled"
+          fi
+          echo "=== End Configuration ==="
           
           # Build the kernel
+          echo "Starting kernel build..."
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
@@ -362,7 +434,7 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             CLANG_TRIPLE=aarch64-linux-gnu- \
-            -j$(nproc --all)
+            -j$(nproc --all) 2>&1 | tee build.log
 
       - name: Verify Build
         run: |
@@ -370,9 +442,17 @@ jobs:
           
           # Check if build was successful
           if [ -f "out/arch/arm64/boot/Image.gz" ]; then
-              echo "Build successful: Image.gz found"
+              echo "✓ Build successful: Image.gz found"
+              ls -lh out/arch/arm64/boot/Image.gz
           else
-              echo "Build failed: Image.gz not found"
+              echo "✗ Build failed: Image.gz not found"
+              echo "=== Build Error Analysis ==="
+              if [ -f "build.log" ]; then
+                echo "Last 50 lines of build log:"
+                tail -50 build.log
+              fi
+              echo "Available files in boot directory:"
+              ls -la out/arch/arm64/boot/ 2>/dev/null || echo "Boot directory not found"
               exit 1
           fi
 
@@ -439,7 +519,8 @@ jobs:
       
             **Kernel Version:** ${{ github.event.inputs.KERNEL_VERSION }}
             **Build ID:** ${{ github.run_id }}
-            **KernelSU:** SukiSU
+            **KernelSU:** ${{ github.event.inputs.KSU_VERSION }}
+            **SuSFS:** ${{ github.event.inputs.ADDITIONAL }}
 
             ## Source References
             - **Kernel Tree:** https://github.com/EmanuelCN/kernel_xiaomi_sm8250
@@ -457,7 +538,8 @@ jobs:
           File: $FILE
           Version: ${{ github.event.inputs.KERNEL_VERSION }}
           Build ID: ${{ github.run_id }}
-          KernelSU: SukiSU-susfs
+          KernelSU: ${{ github.event.inputs.KSU_VERSION }}
+          SuSFS: ${{ github.event.inputs.ADDITIONAL }}
           Kernel Tree: https://github.com/EmanuelCN/kernel_xiaomi_sm8250
           GitHub Action: https://github.com/Sayemx18/kernel_sm8250/blob/base/.github/workflows/build_n0.yml"
 
