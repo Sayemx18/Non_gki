@@ -228,6 +228,18 @@ jobs:
               ;;
           esac
 
+      - name: Remove submodule  
+        run: |
+          cd kernel_tree
+          git submodule deinit -f drivers/kernelsu
+          git rm -f drivers/kernelsu
+          rm -rf .git/modules/drivers/kernelsu
+          git submodule deinit -f KernelSU || true
+          git rm -rf --cached KernelSU || true
+          rm -rf KernelSU
+          rm -rf .git/modules/KernelSU
+          sed -i '/KernelSU/d' .gitmodules || true
+          
       - name: Apply SuSFS Patches
         run: |
           cd kernel_tree
