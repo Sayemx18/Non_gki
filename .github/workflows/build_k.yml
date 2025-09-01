@@ -241,7 +241,7 @@ jobs:
               echo "Setting up RKSU"
               if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
                 echo "RKSU with SuSFS enabled"
-                curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
+                curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-legacy
               else
                 echo "RKSU without SuSFS"
                 curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
