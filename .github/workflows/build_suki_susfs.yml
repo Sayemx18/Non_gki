@@ -175,7 +175,7 @@ jobs:
           # Clone the original source
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
 
-      - name: Apply Patches
+      - name: Remove Submodule
         run: |
           cd kernel_tree
           git submodule deinit -f drivers/kernelsu
@@ -187,7 +187,7 @@ jobs:
           rm -rf .git/modules/KernelSU
           sed -i '/KernelSU/d' .gitmodules || true
           
-      - name: Apply Patches
+      - name: Apply Susfs Patches
         run: |
           cd kernel_tree
           git config --global user.email "action@github.com"
