@@ -178,16 +178,12 @@ jobs:
       - name: Apply Patches
         run: |
           cd kernel_tree
-          git submodule deinit -f drivers/kernelsu
-          git rm -f drivers/kernelsu
-          rm -rf .git/modules/drivers/kernelsu
-          git submodule deinit -f KernelSU || true
-          git rm -rf --cached KernelSU || true
-          rm -rf KernelSU
-          rm -rf .git/modules/KernelSU
-          sed -i '/KernelSU/d' .gitmodules || true 
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git remote add myfork https://github.com/Sayemx18/kernel_sm8250
+          git fetch myfork susfs --depth=10
+          git cherry-pick 0b7a768546f581ad99d395257ef8cec0df8add4f
           
-
       - name: Setup KernelSU
         run: |
           cd kernel_tree
@@ -203,7 +199,7 @@ jobs:
               ;;
             "rksu-susfs")
               echo "Setting up RKSU with SuSFS"
-              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-legacy
               ;;
             "sukisu")
               echo "Setting up SukiSU without SuSFS"
