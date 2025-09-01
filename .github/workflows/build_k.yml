@@ -180,6 +180,50 @@ jobs:
         run: |
           git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
 
+      - name: Apply SuSFS Patches
+        run: |
+          cd kernel_tree
+          if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+            echo "Applying SuSFS patches..."
+            git config --global user.email "action@github.com"
+            git config --global user.name "GitHub Action"
+            git remote add fork https://github.com/Impqxr/kernel_xiaomi_sm8250.git
+            git fetch fork susfs-v1.5.5 --depth=10
+            
+            echo "Checking cherry-pick commit..."
+            git show --name-only a50639ef2a4b2beec61575b713369f860c2f6252 || echo "Could not show commit details"
+            
+            git cherry-pick a50639ef2a4b2beec61575b713369f860c2f6252
+            
+            # Re-add KSU config if it was removed by the patch
+            if ! grep -q "config KSU" arch/arm64/Kconfig; then
+              echo "Re-adding KSU config to arch/arm64/Kconfig"
+              echo "" >> arch/arm64/Kconfig
+              echo "config KSU" >> arch/arm64/Kconfig
+              echo "	tristate \"KernelSU function support\"" >> arch/arm64/Kconfig
+              echo "	select OVERLAY_FS" >> arch/arm64/Kconfig
+              echo "	default y" >> arch/arm64/Kconfig
+              echo "	help" >> arch/arm64/Kconfig
+              echo "	  Enable kernel-level root privileges on Android System." >> arch/arm64/Kconfig
+              echo "" >> arch/arm64/Kconfig
+              echo "config KSU_MANUAL_HOOK" >> arch/arm64/Kconfig
+              echo "	bool \"KernelSU manual hook\"" >> arch/arm64/Kconfig
+              echo "	depends on KSU" >> arch/arm64/Kconfig
+              echo "	default y" >> arch/arm64/Kconfig
+              echo "	help" >> arch/arm64/Kconfig
+              echo "	  Enable KernelSU manual hook support." >> arch/arm64/Kconfig
+              echo "" >> arch/arm64/Kconfig
+              echo "KSU config re-added"
+            else
+              echo "KSU config already exists"
+            fi
+            
+            echo "SuSFS patches applied successfully"
+          else
+            echo "SuSFS not enabled, skipping patches"
+          fi
+
+         
       - name: Setup KernelSU
         run: |
           cd kernel_tree
@@ -227,61 +271,6 @@ jobs:
               echo "KernelSU is disabled"
               ;;
           esac
-
-      - name: Remove submodule  
-        run: |
-          cd kernel_tree
-          git submodule deinit -f drivers/kernelsu
-          git rm -f drivers/kernelsu
-          rm -rf .git/modules/drivers/kernelsu
-          git submodule deinit -f KernelSU || true
-          git rm -rf --cached KernelSU || true
-          rm -rf KernelSU
-          rm -rf .git/modules/KernelSU
-          sed -i '/KernelSU/d' .gitmodules || true
-          
-      - name: Apply SuSFS Patches
-        run: |
-          cd kernel_tree
-          if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-            echo "Applying SuSFS patches..."
-            git config --global user.email "action@github.com"
-            git config --global user.name "GitHub Action"
-            git remote add fork https://github.com/Impqxr/kernel_xiaomi_sm8250.git
-            git fetch fork susfs-v1.5.5 --depth=10
-            
-            echo "Checking cherry-pick commit..."
-            git show --name-only a50639ef2a4b2beec61575b713369f860c2f6252 || echo "Could not show commit details"
-            
-            git cherry-pick a50639ef2a4b2beec61575b713369f860c2f6252
-            
-            # Re-add KSU config if it was removed by the patch
-            if ! grep -q "config KSU" arch/arm64/Kconfig; then
-              echo "Re-adding KSU config to arch/arm64/Kconfig"
-              echo "" >> arch/arm64/Kconfig
-              echo "config KSU" >> arch/arm64/Kconfig
-              echo "	tristate \"KernelSU function support\"" >> arch/arm64/Kconfig
-              echo "	select OVERLAY_FS" >> arch/arm64/Kconfig
-              echo "	default y" >> arch/arm64/Kconfig
-              echo "	help" >> arch/arm64/Kconfig
-              echo "	  Enable kernel-level root privileges on Android System." >> arch/arm64/Kconfig
-              echo "" >> arch/arm64/Kconfig
-              echo "config KSU_MANUAL_HOOK" >> arch/arm64/Kconfig
-              echo "	bool \"KernelSU manual hook\"" >> arch/arm64/Kconfig
-              echo "	depends on KSU" >> arch/arm64/Kconfig
-              echo "	default y" >> arch/arm64/Kconfig
-              echo "	help" >> arch/arm64/Kconfig
-              echo "	  Enable KernelSU manual hook support." >> arch/arm64/Kconfig
-              echo "" >> arch/arm64/Kconfig
-              echo "KSU config re-added"
-            else
-              echo "KSU config already exists"
-            fi
-            
-            echo "SuSFS patches applied successfully"
-          else
-            echo "SuSFS not enabled, skipping patches"
-          fi
 
       - name: Detect and Configure SuSFS
         run: |
