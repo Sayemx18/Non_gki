@@ -41,18 +41,13 @@ on:
           - 'none'
           - 'ksu'
           - 'rksu'
+          - 'rksu-susfs'
           - 'sukisu'
+          - 'sukisu-susfs'
           - 'sukisu-ultra'
+          - 'sukisu-ultra-susfs'
         default: 'sukisu-ultra'
         required: true
-      ADDITIONAL:
-        description: 'Additional Features'
-        type: choice
-        options:
-          - 'none'
-          - 'susfs'
-        default: 'none'
-        required: false
       UPLOAD_TO_TELEGRAM:
         description: 'Upload to Telegram'
         type: choice
@@ -128,47 +123,46 @@ jobs:
           echo "KERNEL_TREE_BRANCH=${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}" >> $GITHUB_ENV
           echo "CODENAME=${{ matrix.device }}" >> $GITHUB_ENV
           echo "KSU_VERSION=${{ github.event.inputs.KSU_VERSION }}" >> $GITHUB_ENV
-          echo "ADDITIONAL=${{ github.event.inputs.ADDITIONAL }}" >> $GITHUB_ENV
           echo "KERNEL_VERSION=${{ github.event.inputs.KERNEL_VERSION }}" >> $GITHUB_ENV
           
-          # Set feature flags
-          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "ksu" || "${{ github.event.inputs.KSU_VERSION }}" == "rksu" || "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" || "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
-            echo "KSU_ENABLE=1" >> $GITHUB_ENV
-          else
-            echo "KSU_ENABLE=0" >> $GITHUB_ENV
-          fi
+          # Set feature flags based on KSU version
+          case "${{ github.event.inputs.KSU_VERSION }}" in
+            "ksu"|"rksu"|"sukisu"|"sukisu-ultra")
+              echo "KSU_ENABLE=1" >> $GITHUB_ENV
+              echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
+              ;;
+            "rksu-susfs"|"sukisu-susfs"|"sukisu-ultra-susfs")
+              echo "KSU_ENABLE=1" >> $GITHUB_ENV
+              echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "KSU_ENABLE=0" >> $GITHUB_ENV
+              echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
+              ;;
+          esac
           
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
-            echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
-          else
-            echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
-          fi
-          
-          # Set KSU ZIP string
+          # Set KSU ZIP string based on version
           case "${{ github.event.inputs.KSU_VERSION }}" in
             "ksu")
               echo "KSU_ZIP_STR=KernelSU" >> $GITHUB_ENV
               ;;
             "rksu")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
-                echo "KSU_ZIP_STR=RKSU_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=RKSU" >> $GITHUB_ENV
-              fi
+              echo "KSU_ZIP_STR=RKSU" >> $GITHUB_ENV
+              ;;
+            "rksu-susfs")
+              echo "KSU_ZIP_STR=RKSU_SuSFS" >> $GITHUB_ENV
               ;;
             "sukisu")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
-                echo "KSU_ZIP_STR=SukiSU_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=SukiSU" >> $GITHUB_ENV
-              fi
+              echo "KSU_ZIP_STR=SukiSU" >> $GITHUB_ENV
+              ;;
+            "sukisu-susfs")
+              echo "KSU_ZIP_STR=SukiSU_SuSFS" >> $GITHUB_ENV
               ;;
             "sukisu-ultra")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
-                echo "KSU_ZIP_STR=SukiSU-Ultra_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=SukiSU-Ultra" >> $GITHUB_ENV
-              fi
+              echo "KSU_ZIP_STR=SukiSU-Ultra" >> $GITHUB_ENV
+              ;;
+            "sukisu-ultra-susfs")
+              echo "KSU_ZIP_STR=SukiSU-Ultra_SuSFS" >> $GITHUB_ENV
               ;;
             *)
               echo "KSU_ZIP_STR=NoKernelSU" >> $GITHUB_ENV
@@ -200,42 +194,32 @@ jobs:
           
           case "${{ github.event.inputs.KSU_VERSION }}" in
             "ksu")
-              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "Official KernelSU does not support SuSFS"
-                exit 1
-              fi
               echo "Setting up Official KernelSU"
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
               ;;
             "rksu")
-              echo "Setting up RKSU"
-              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "RKSU with SuSFS enabled"
-                curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
-              else
-                echo "RKSU without SuSFS"
-                curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
-              fi
+              echo "Setting up RKSU without SuSFS"
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+              ;;
+            "rksu-susfs")
+              echo "Setting up RKSU with SuSFS"
+              curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
               ;;
             "sukisu")
-              echo "Setting up SukiSU"
-              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "SukiSU with SuSFS enabled"
-                curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
-              else
-                echo "SukiSU without SuSFS"
-                curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
-              fi
+              echo "Setting up SukiSU without SuSFS"
+              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
+              ;;
+            "sukisu-susfs")
+              echo "Setting up SukiSU with SuSFS"
+              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
               ;;
             "sukisu-ultra")
-              echo "Setting up SukiSU-Ultra"
-              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "SukiSU-Ultra with SuSFS enabled"
-                curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-              else
-                echo "SukiSU-Ultra without SuSFS"
-                curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
-              fi
+              echo "Setting up SukiSU-Ultra without SuSFS"
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+              ;;
+            "sukisu-ultra-susfs")
+              echo "Setting up SukiSU-Ultra with SuSFS"
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
               ;;
             *)
               echo "KernelSU is disabled"
@@ -284,8 +268,8 @@ jobs:
               echo "KSU disabled in config"
           fi
 
-          # Enable KSU_MANUAL_HOOK for sukisu-ultra and other KSU variants
-          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "rksu" ]] || [[ "$KSU_ENABLE" -eq 1 ]]; then
+          # Enable KSU_MANUAL_HOOK for all KSU variants
+          if [[ "$KSU_ENABLE" -eq 1 ]]; then
               # Only enable if KSU was properly set up
               if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
                   scripts/config --file out/.config -e KSU_MANUAL_HOOK
@@ -294,11 +278,12 @@ jobs:
                   echo "Warning: KernelSU not properly set up, skipping KSU_MANUAL_HOOK"
               fi
           else
-              echo "KSU_MANUAL_HOOK not needed for ${{ github.event.inputs.KSU_VERSION }}"
+              echo "KSU_MANUAL_HOOK not needed - KSU disabled"
           fi
 
-          # Configure SuSFS
+          # Configure SuSFS (only when SuSFS is enabled)
           if [ "$SuSFS_ENABLE" -eq 1 ]; then
+              echo "Enabling SuSFS features"
               scripts/config --file out/.config \
                   -e KSU_SUSFS \
                   -e KSU_SUSFS_HAS_MAGIC_MOUNT \
@@ -316,6 +301,7 @@ jobs:
                   -e KSU_SUSFS_OPEN_REDIRECT
               echo "SuSFS features enabled"
           else
+              echo "Disabling SuSFS features"
               scripts/config --file out/.config \
                   -d KSU_SUSFS \
                   -d KSU_SUSFS_HAS_MAGIC_MOUNT \
@@ -334,11 +320,13 @@ jobs:
               echo "SuSFS features disabled"
           fi
           
-          # Debug: Show final KSU configuration
-          echo "=== Final KSU Configuration ==="
-          echo "KSU_ENABLE: $KSU_ENABLE"
+          # Debug: Show final configuration
+          echo "=== Final Build Configuration ==="
           echo "KSU_VERSION: ${{ github.event.inputs.KSU_VERSION }}"
-          echo "Checking KSU config options in .config:"
+          echo "KSU_ENABLE: $KSU_ENABLE"
+          echo "SuSFS_ENABLE: $SuSFS_ENABLE"
+          echo "KSU_ZIP_STR: $KSU_ZIP_STR"
+          echo "Checking config options:"
           if grep -q "CONFIG_KSU=y" out/.config 2>/dev/null; then
             echo "✓ CONFIG_KSU=y found"
           else
@@ -349,7 +337,12 @@ jobs:
           else
             echo "✗ CONFIG_KSU_MANUAL_HOOK not enabled or not found"
           fi
-          echo "=== End KSU Configuration ==="
+          if grep -q "CONFIG_KSU_SUSFS=y" out/.config 2>/dev/null; then
+            echo "✓ CONFIG_KSU_SUSFS=y found"
+          else
+            echo "✗ CONFIG_KSU_SUSFS not enabled or not found"
+          fi
+          echo "=== End Configuration ==="
           
           # Build the kernel
           make O=out \
@@ -409,11 +402,7 @@ jobs:
             cp -f dtbo.img AnyKernel3
           fi
           build_date=$(date +"%Y%m%d-%H%M%S")
-          ADDITIONAL_STR=""
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]]; then
-            ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
-          fi
-          name="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
+          name="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}_${build_date}_anykernel3.zip"
           
           cd AnyKernel3
           zip -q -r $name *
@@ -440,7 +429,8 @@ jobs:
       
             **Kernel Version:** ${{ github.event.inputs.KERNEL_VERSION }}
             **Build ID:** ${{ github.run_id }}
-            **KernelSU:** SukiSU
+            **KernelSU Version:** ${{ github.event.inputs.KSU_VERSION }}
+            **SuSFS Enabled:** ${{ env.SuSFS_ENABLE == '1' && 'Yes' || 'No' }}
 
             ## Source References
             - **Kernel Tree:** https://github.com/EmanuelCN/kernel_xiaomi_sm8250
@@ -458,7 +448,8 @@ jobs:
           File: $FILE
           Version: ${{ github.event.inputs.KERNEL_VERSION }}
           Build ID: ${{ github.run_id }}
-          KernelSU: SukiSU
+          KernelSU: ${{ github.event.inputs.KSU_VERSION }}
+          SuSFS: ${{ env.SuSFS_ENABLE == '1' && 'Enabled' || 'Disabled' }}
           Kernel Tree: https://github.com/EmanuelCN/kernel_xiaomi_sm8250
           GitHub Action: https://github.com/Sayemx18/kernel_sm8250/blob/base/.github/workflows/build_n0.yml"
 
