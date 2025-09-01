@@ -1,0 +1,469 @@
+# KSU Kernel Build Workflow
+name: SUSFS FINAL
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      BUILD_TITLE:
+        description: 'Custom Build Title'
+        required: false
+        type: string
+      KERNEL_TREE_1:
+        description: 'Kernel Tree 1'
+        default: 'https://github.com/EmanuelCN/kernel_xiaomi_sm8250'
+        required: true
+        type: string
+      KERNEL_TREE_BRANCH_1:
+        description: 'Kernel Tree Branch 1'
+        default: 'staging'
+        required: true
+        type: string
+      CODENAME:
+        description: 'Phone Codename'
+        type: choice
+        options:
+          - 'alioth'
+          - 'apollo'
+          - 'munch'
+          - 'all'
+        default: 'alioth'
+        required: true
+      KERNEL_VERSION:
+        description: 'Custom Kernel Version (e.g., 16.4.0, 16.4.1)'
+        default: '16.4.0'
+        required: true
+        type: string
+      KSU_VERSION:
+        description: 'KernelSU Version'
+        type: choice
+        options:
+          - 'none'
+          - 'ksu'
+          - 'rksu'
+          - 'sukisu'
+          - 'sukisu-ultra'
+        default: 'sukisu-ultra'
+        required: true
+      ADDITIONAL:
+        description: 'Additional Features'
+        type: choice
+        options:
+          - 'none'
+          - 'susfs'
+        default: 'none'
+        required: false
+      UPLOAD_TO_TELEGRAM:
+        description: 'Upload to Telegram'
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
+        default: 'no'
+        required: false
+      UPLOAD_TO_RELEASE:
+        description: 'Upload to GitHub Release'
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
+        default: 'no'
+        required: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event.inputs.CODENAME }}" == "all" ]; then
+            echo "matrix=[\"alioth\", \"apollo\", \"munch\"]" >> $GITHUB_OUTPUT
+          else
+            echo "matrix=[\"${{ github.event.inputs.CODENAME }}\"]" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        device: ${{ fromJson(needs.setup.outputs.matrix) }}
+    env:
+      UPLOAD_TO_RELEASE: false
+
+    steps:
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y flex libncurses6 bc bison build-essential ccache curl file git kmod libelf-dev libssl-dev libudev-dev libpci-dev libiberty-dev autoconf llvm lld
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.workflow }}-${{ github.job }}-${{ matrix.device }}
+
+      - name: Cache Clang Toolchain
+        id: clang-cache
+        uses: actions/cache@v4
+        with:
+          path: clang
+          key: neutron-clang-10032024
+          restore-keys: |
+            neutron-clang-
+      
+      - name: Download & Extract Clang
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        run: |
+          wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
+          mkdir clang
+          unzstd -d clang.tar.zst
+          tar -xf clang.tar -C clang
+          
+      - name: Set Kernel Environment Variables
+        run: |
+          echo "KERNEL_TREE=${{ github.event.inputs.KERNEL_TREE_1 }}" >> $GITHUB_ENV
+          echo "KERNEL_TREE_BRANCH=${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}" >> $GITHUB_ENV
+          echo "CODENAME=${{ matrix.device }}" >> $GITHUB_ENV
+          echo "KSU_VERSION=${{ github.event.inputs.KSU_VERSION }}" >> $GITHUB_ENV
+          echo "ADDITIONAL=${{ github.event.inputs.ADDITIONAL }}" >> $GITHUB_ENV
+          echo "KERNEL_VERSION=${{ github.event.inputs.KERNEL_VERSION }}" >> $GITHUB_ENV
+          
+          # Set feature flags
+          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "ksu" || "${{ github.event.inputs.KSU_VERSION }}" == "rksu" || "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" || "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
+            echo "KSU_ENABLE=1" >> $GITHUB_ENV
+          else
+            echo "KSU_ENABLE=0" >> $GITHUB_ENV
+          fi
+          
+          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
+            echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
+          else
+            echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
+          fi
+          
+          # Set KSU ZIP string
+          case "${{ github.event.inputs.KSU_VERSION }}" in
+            "ksu")
+              echo "KSU_ZIP_STR=KernelSU" >> $GITHUB_ENV
+              ;;
+            "rksu")
+              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
+                echo "KSU_ZIP_STR=RKSU_SuSFS" >> $GITHUB_ENV
+              else
+                echo "KSU_ZIP_STR=RKSU" >> $GITHUB_ENV
+              fi
+              ;;
+            "sukisu")
+              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
+                echo "KSU_ZIP_STR=SukiSU_SuSFS" >> $GITHUB_ENV
+              else
+                echo "KSU_ZIP_STR=SukiSU" >> $GITHUB_ENV
+              fi
+              ;;
+            "sukisu-ultra")
+              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
+                echo "KSU_ZIP_STR=SukiSU-Ultra_SuSFS" >> $GITHUB_ENV
+              else
+                echo "KSU_ZIP_STR=SukiSU-Ultra" >> $GITHUB_ENV
+              fi
+              ;;
+            *)
+              echo "KSU_ZIP_STR=NoKernelSU" >> $GITHUB_ENV
+              ;;
+          esac
+          
+      - name: Clone kernel source 
+        id: kernel
+        run: |
+          # Clone the original source
+          git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
+          
+      - name: Apply Patches
+        run: |
+          cd kernel_tree
+          git submodule deinit -f drivers/kernelsu
+          git rm -f drivers/kernelsu
+          rm -rf .git/modules/drivers/kernelsu
+          git submodule deinit -f KernelSU || true
+          git rm -rf --cached KernelSU || true
+          rm -rf KernelSU
+          rm -rf .git/modules/KernelSU
+          sed -i '/KernelSU/d' .gitmodules || true 
+          
+
+      - name: Setup KernelSU
+        run: |
+          cd kernel_tree
+          
+          case "${{ github.event.inputs.KSU_VERSION }}" in
+            "ksu")
+              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+                echo "Official KernelSU does not support SuSFS"
+                exit 1
+              fi
+              echo "Setting up Official KernelSU"
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
+              ;;
+            "rksu")
+              echo "Setting up RKSU"
+              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+                echo "RKSU with SuSFS enabled"
+                curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
+              else
+                echo "RKSU without SuSFS"
+                curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+              fi
+              ;;
+            "sukisu")
+              echo "Setting up SukiSU"
+              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+                echo "SukiSU with SuSFS enabled"
+                curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
+              else
+                echo "SukiSU without SuSFS"
+                curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
+              fi
+              ;;
+            "sukisu-ultra")
+              echo "Setting up SukiSU-Ultra"
+              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+                echo "SukiSU-Ultra with SuSFS enabled"
+                curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+              else
+                echo "SukiSU-Ultra without SuSFS"
+                curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+              fi
+              ;;
+            *)
+              echo "KernelSU is disabled"
+              ;;
+          esac
+          
+      - name: Build Kernel
+        run: |
+          export PATH="$(pwd)/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=ARM64
+          export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
+          
+          # Setup ccache
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          export CC="ccache clang"
+          export CXX="ccache clang++"
+          
+          cd kernel_tree
+          
+          # Get git commit info
+          GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
+          echo "GIT_COMMIT_ID=$GIT_COMMIT_ID" >> $GITHUB_ENV
+          
+          # Update defconfig with custom version, date and commit ID
+          local_version_str="-perf"
+          local_version_date_str="-v${{ github.event.inputs.KERNEL_VERSION }}-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+          sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/vendor/${{ matrix.device }}_defconfig
+          
+          # Build kernel config
+          make O=out vendor/${{ matrix.device }}_defconfig
+          
+          # Configure KSU
+          if [ "$KSU_ENABLE" -eq 1 ]; then
+              # Check if KernelSU was properly set up before enabling it
+              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+                  scripts/config --file out/.config -e KSU
+                  echo "KSU enabled in config"
+              else
+                  echo "Warning: KernelSU files not found, disabling KSU"
+                  scripts/config --file out/.config -d KSU
+                  echo "KSU disabled due to missing files"
+              fi
+          else
+              scripts/config --file out/.config -d KSU
+              echo "KSU disabled in config"
+          fi
+
+          # Enable KSU_MANUAL_HOOK for sukisu-ultra and other KSU variants
+          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "rksu" ]] || [[ "$KSU_ENABLE" -eq 1 ]]; then
+              # Only enable if KSU was properly set up
+              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+                  scripts/config --file out/.config -e KSU_MANUAL_HOOK
+                  echo "KSU_MANUAL_HOOK enabled"
+              else
+                  echo "Warning: KernelSU not properly set up, skipping KSU_MANUAL_HOOK"
+              fi
+          else
+              echo "KSU_MANUAL_HOOK not needed for ${{ github.event.inputs.KSU_VERSION }}"
+          fi
+
+          # Configure SuSFS
+          if [ "$SuSFS_ENABLE" -eq 1 ]; then
+              scripts/config --file out/.config \
+                  -e KSU_SUSFS \
+                  -e KSU_SUSFS_HAS_MAGIC_MOUNT \
+                  -e KSU_SUSFS_SUS_PATH \
+                  -e KSU_SUSFS_SUS_MOUNT \
+                  -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+                  -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
+                  -e KSU_SUSFS_SUS_KSTAT \
+                  -e KSU_SUSFS_TRY_UMOUNT \
+                  -e KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
+                  -e KSU_SUSFS_SPOOF_UNAME \
+                  -e KSU_SUSFS_ENABLE_LOG \
+                  -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+                  -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+                  -e KSU_SUSFS_OPEN_REDIRECT
+              echo "SuSFS features enabled"
+          else
+              scripts/config --file out/.config \
+                  -d KSU_SUSFS \
+                  -d KSU_SUSFS_HAS_MAGIC_MOUNT \
+                  -d KSU_SUSFS_SUS_PATH \
+                  -d KSU_SUSFS_SUS_MOUNT \
+                  -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+                  -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
+                  -d KSU_SUSFS_SUS_KSTAT \
+                  -d KSU_SUSFS_TRY_UMOUNT \
+                  -d KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
+                  -d KSU_SUSFS_SPOOF_UNAME \
+                  -d KSU_SUSFS_ENABLE_LOG \
+                  -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+                  -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+                  -d KSU_SUSFS_OPEN_REDIRECT
+              echo "SuSFS features disabled"
+          fi
+          
+          # Debug: Show final KSU configuration
+          echo "=== Final KSU Configuration ==="
+          echo "KSU_ENABLE: $KSU_ENABLE"
+          echo "KSU_VERSION: ${{ github.event.inputs.KSU_VERSION }}"
+          echo "Checking KSU config options in .config:"
+          if grep -q "CONFIG_KSU=y" out/.config 2>/dev/null; then
+            echo "✓ CONFIG_KSU=y found"
+          else
+            echo "✗ CONFIG_KSU not enabled or not found"
+          fi
+          if grep -q "CONFIG_KSU_MANUAL_HOOK=y" out/.config 2>/dev/null; then
+            echo "✓ CONFIG_KSU_MANUAL_HOOK=y found"
+          else
+            echo "✗ CONFIG_KSU_MANUAL_HOOK not enabled or not found"
+          fi
+          echo "=== End KSU Configuration ==="
+          
+          # Build the kernel
+          make O=out \
+            ARCH=arm64 \
+            SUBARCH=arm64 \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CC=clang \
+            HOSTCC=gcc \
+            HOSTCFLAGS="-O2 -Wall" \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            -j$(nproc --all)
+
+      - name: Verify Build
+        run: |
+          cd kernel_tree
+          
+          # Check if build was successful
+          if [ -f "out/arch/arm64/boot/Image.gz" ]; then
+              echo "Build successful: Image.gz found"
+          else
+              echo "Build failed: Image.gz not found"
+              exit 1
+          fi
+
+      - name: AnyKernel3
+        if: success()
+        run: |
+          case "${{ matrix.device }}" in
+            "alioth")
+              echo "Cloning AnyKernel3 for alioth"
+              git clone --recursive --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
+              ;;
+            "apollo")
+              echo "Cloning AnyKernel3 for apollo"
+              git clone --recursive --depth=1 https://github.com/Sayemx18/AKapollo -b main AnyKernel3
+              ;;
+            "munch")
+              echo "Cloning AnyKernel3 for munch" 
+              git clone --recursive --depth=1 https://github.com/Sayemx18/AKmunch -b main AnyKernel3
+              ;;
+            *)
+              echo "Unknown device: ${{ matrix.device }}. Using default AnyKernel3 for alioth..."
+              git clone --recursive --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
+              ;;
+          esac
+          if [ -e "Image.gz" ]; then
+            cp -f Image.gz AnyKernel3
+          fi
+          if [ -e "dtb.img" ]; then
+            mv -f dtb.img dtb
+            cp -f dtb AnyKernel3/dtb
+          fi
+          if [ -e "dtbo.img" ]; then
+            cp -f dtbo.img AnyKernel3
+          fi
+          build_date=$(date +"%Y%m%d-%H%M%S")
+          ADDITIONAL_STR=""
+          if [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]]; then
+            ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
+          fi
+          name="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
+          
+          cd AnyKernel3
+          zip -q -r $name *
+          mv $name ../
+          echo "zipname=$name" >> $GITHUB_OUTPUT
+        working-directory: kernel_tree/out/arch/arm64/boot/
+        id: anykernel
+
+      - name: Upload Flashable Kernel Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.anykernel.outputs.zipname }}
+          path: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
+
+      - name: Upload to Release (if enabled)
+        if: ${{ github.event.inputs.UPLOAD_TO_RELEASE == 'yes' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
+          tag_name: SukiSU-v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
+          name: ${{ github.event.inputs.BUILD_TITLE || format('N0Kernel v{0}', github.event.inputs.KERNEL_VERSION) }}
+          body: |
+            ## Build Information
+      
+            **Kernel Version:** ${{ github.event.inputs.KERNEL_VERSION }}
+            **Build ID:** ${{ github.run_id }}
+            **KernelSU:** SukiSU
+
+            ## Source References
+            - **Kernel Tree:** https://github.com/EmanuelCN/kernel_xiaomi_sm8250
+            - **GitHub Action:** https://github.com/Sayemx18/kernel_sm8250/blob/base/.github/workflows/build_n0.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload Kernel to Telegram
+        if: ${{ github.event.inputs.UPLOAD_TO_TELEGRAM == 'yes' }}
+        run: |
+          FILE="${{ steps.anykernel.outputs.zipname }}"
+          CAPTION="N0Kernel build completed 
+          
+          Device: ${{ matrix.device }}
+          File: $FILE
+          Version: ${{ github.event.inputs.KERNEL_VERSION }}
+          Build ID: ${{ github.run_id }}
+          KernelSU: SukiSU
+          Kernel Tree: https://github.com/EmanuelCN/kernel_xiaomi_sm8250
+          GitHub Action: https://github.com/Sayemx18/kernel_sm8250/blob/base/.github/workflows/build_n0.yml"
+
+          curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
+          -F document=@kernel_tree/out/arch/arm64/boot/$FILE \
+          -F caption="$CAPTION" \
+          -F parse_mode="HTML" \
+          "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
