@@ -1,5 +1,5 @@
 # KSU Kernel Build Workflow with KPM Support
-name: N0 Kernel Build with KSU Variants and KPM
+name: Redline Kernel
 
 on:
   pull_request:
@@ -386,7 +386,7 @@ jobs:
           ADDITIONAL_STR=""
           [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]] && ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
           
-          zipname="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
+          zipname="Redline_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}.zip"
           
           cd anykernel
           zip -q -r "../$zipname" *
