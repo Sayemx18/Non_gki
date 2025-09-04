@@ -118,8 +118,8 @@ jobs:
         run: |
           # Feature flags
           KSU_ENABLE=$([[ "${{ github.event.inputs.KSU_VERSION }}" =~ ^(ksu|rksu|sukisu|sukisu-ultra)$ ]] && echo 1 || echo 0)
-          SuSFS_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (susfs|susfs-kmp) ]] && echo 1 || echo 0)
-          KPM_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (kpm|susfs-kmp) ]] && echo 1 || echo 0)
+          SuSFS_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (susfs|susfs-kpm) ]] && echo 1 || echo 0)
+          KPM_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (kpm|susfs-kpm) ]] && echo 1 || echo 0)
           
           echo "KSU_ENABLE=$KSU_ENABLE" >> $GITHUB_ENV
           echo "SuSFS_ENABLE=$SuSFS_ENABLE" >> $GITHUB_ENV
