@@ -11,12 +11,12 @@ on:
         type: string
       KERNEL_TREE:
         description: 'Kernel Repository URL'
-        default: 'https://github.com/EmanuelCN/kernel_xiaomi_sm8250'
+        default: 'https://github.com/PocoF3Releases/kernel_xiaomi_sm8250'
         required: true
         type: string
       KERNEL_BRANCH:
         description: 'Kernel Branch'
-        default: 'staging'
+        default: 'aosp-16'
         required: true
         type: string
       CODENAME:
@@ -32,7 +32,7 @@ on:
       KERNEL_VERSION:
         description: 'Kernel Version (e.g., 16.4.0)'
         default: '16.4.0'
-        required: true
+        required: false
         type: string
       KSU_VERSION:
         description: 'KernelSU Version'
@@ -360,37 +360,26 @@ jobs:
       - name: Package with AnyKernel3
         if: success()
         run: |
-          cd kernel_tree/out/arch/arm64/boot
+          cd kernel_tree
           
-          # Clone appropriate AnyKernel3 repository
-          case "${{ matrix.device }}" in
-            "alioth")
-              git clone --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
-              ;;
-            "apollo")
-              git clone --depth=1 https://github.com/Sayemx18/AKapollo -b main AnyKernel3
-              ;;
-            "munch")
-              git clone --depth=1 https://github.com/Sayemx18/AKmunch -b main AnyKernel3
-              ;;
-            *)
-              echo "WARNING: Unknown device, using alioth AnyKernel3"
-              git clone --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
-              ;;
-          esac
+          echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/Sayemx18/AnyKernel3)"
+          git clone https://github.com/Sayemx18/AnyKernel3 -b main --single-branch --depth=1 anykernel
           
-          # Copy kernel files
-          [ -f "Image" ] && cp Image AnyKernel3/
-          [ -f "Image" ] && cp Image AnyKernel3/
-          
-          # Handle DTB
-          if [ -f "dtb.img" ]; then
-            mv dtb.img dtb
-            cp dtb AnyKernel3/
+          echo "Generating [out/arch/arm64/boot/dtb]......"
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+
+          cp out/arch/arm64/boot/Image anykernel/
+          cp out/arch/arm64/boot/dtb anykernel/
+
+          if [ -f "out/arch/arm64/boot/dtbo.img" ]; then
+            cp out/arch/arm64/boot/dtbo.img anykernel/
+            echo "DTBO included in flashable package"
+            # Show DTBO size
+            dtbo_size=$(ls -lh "out/arch/arm64/boot/dtbo.img" | awk '{print $5}')
+            echo "DTBO size: $dtbo_size"
+          else
+            echo "No DTBO found (this is normal if device doesn't use overlays)"
           fi
-          
-          # Handle DTBO if present
-          [ -f "dtbo.img" ] && cp dtbo.img AnyKernel3/
           
           # Create filename
           build_date=$(date +"%Y%m%d-%H%M%S")
@@ -399,7 +388,7 @@ jobs:
           
           zipname="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
           
-          cd AnyKernel3
+          cd anykernel
           zip -q -r "../$zipname" *
           
           echo "zipname=$zipname" >> $GITHUB_OUTPUT
