@@ -165,7 +165,7 @@ jobs:
           
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.KERNEL_BRANCH }} kernel_tree
+          git clone ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.KERNEL_BRANCH }} kernel_tree
           
       - name: Setup KernelSU
         if: env.KSU_ENABLE == '1'
