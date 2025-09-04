@@ -93,7 +93,7 @@ jobs:
           sudo apt-get install -y \
           build-essential git curl wget bison flex zip bc \
           cpio libssl-dev libncurses-dev gcc \
-          python3 python3-pip ccache lld llvm clang llvm-as llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip
+          python3 python3-pip ccache lld
           sudo apt update
           sudo apt install -y software-properties-common
           apt policy python2
@@ -102,6 +102,15 @@ jobs:
           curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
           sudo python2.7 get-pip.py
           pip2.7 --version
+
+      - name: Install LLVM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-14 clang-14
+          sudo ln -s /usr/bin/llvm-nm-14 /usr/bin/llvm-nm
+          sudo ln -s /usr/bin/llvm-objcopy-14 /usr/bin/llvm-objcopy
+          sudo ln -s /usr/bin/llvm-objdump-14 /usr/bin/llvm-objdump
+          sudo ln -s /usr/bin/llvm-strip-14 /usr/bin/llvm-strip
           
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
