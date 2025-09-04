@@ -89,9 +89,20 @@ jobs:
     steps:
       - name: Install Dependencies
         run: |
-          sudo apt update -q
-          sudo apt install -y flex libncurses6 bc bison build-essential ccache curl file git kmod libelf-dev libssl-dev libudev-dev libpci-dev libiberty-dev autoconf llvm lld unzstd
-
+          sudo apt-get update -y 
+          sudo apt-get install -y \
+          build-essential git curl wget bison flex zip bc \
+          cpio libssl-dev libncurses-dev gcc \
+          python3 python3-pip ccache
+          sudo apt update
+          sudo apt install -y software-properties-common
+          apt policy python2
+          sudo apt install -y python2
+          python2 --version
+          curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+          sudo python2.7 get-pip.py
+          pip2.7 --version
+          
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
