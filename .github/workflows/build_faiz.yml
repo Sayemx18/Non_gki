@@ -109,21 +109,20 @@ jobs:
           key: ${{ github.workflow }}-${{ github.job }}-${{ matrix.device }}
           max-size: 2G
 
-      - name: Cache Clang Toolchain
-        id: clang-cache
+      - name: Cache ZyCromerZ Clang
         uses: actions/cache@v4
+        id: clang-cache
         with:
-          path: clang
-          key: neutron-clang-10032024
-          restore-keys: neutron-clang-
-      
-      - name: Download & Extract Clang
+          path: toolchain/zyc-clang
+          key: ${{ runner.os }}-zyc-clang-20.0.0git-20250129
+
+      - name: Download ZyCromerZ Clang Toolchain
         if: steps.clang-cache.outputs.cache-hit != 'true'
         run: |
-          wget -q https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst
-          mkdir clang
-          unzstd -q clang.tar.zst
-          tar -xf clang.tar -C clang --strip-components=1
+          mkdir -p toolchain/zyc-clang; cd toolchain
+          wget https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz
+          tar -xzf Clang-20.0.0git-20250129.tar.gz -C zyc-clang
+          rm Clang-20.0.0git-20250129.tar.gz
           
       - name: Set Environment Variables
         run: |
@@ -219,7 +218,7 @@ jobs:
           
       - name: Build Kernel
         run: |
-          export PATH="$(pwd)/clang/bin:$PATH"
+          export PATH="$(pwd)/zyc-clang/bin:$PATH"
           export CCACHE_DIR="$HOME/.cache/ccache"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           
