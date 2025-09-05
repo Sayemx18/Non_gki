@@ -479,61 +479,28 @@ jobs:
           tag_name: v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
           name: ${{ github.event.inputs.BUILD_TITLE || format('Redline v{0}', github.event.inputs.KERNEL_VERSION) }}
           body: |
-            ## N0Kernel Build Information
-            
-            **Device:** ${{ matrix.device }}  
-            **Kernel Version:** ${{ github.event.inputs.KERNEL_VERSION }}  
-            **Build ID:** ${{ github.run_id }}  
-            **KernelSU:** ${{ github.event.inputs.KSU_VERSION }}  
-            **Additional Features:** ${{ github.event.inputs.ADDITIONAL }}
-            
-            ### Features Enabled:
-            - **KSU:** ${{ env.KSU_ENABLE == '1' && 'ENABLED' || 'DISABLED' }}
-            - **SuSFS:** ${{ env.SuSFS_ENABLE == '1' && 'ENABLED' || 'DISABLED' }}  
-            - **KPM:** ${{ env.KPM_ENABLE == '1' && 'ENABLED' || 'DISABLED' }}
-            
-            ### References:
-            - **Source:** ${{ github.event.inputs.KERNEL_TREE }}
-            - **Branch:** ${{ github.event.inputs.KERNEL_BRANCH }}
-            - **Workflow:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Device: ${{ matrix.device }}
+            Kernel Version: ${{ github.event.inputs.KERNEL_VERSION }}
+            Build ID: ${{ github.run_id }}
+            KernelSU: ${{ github.event.inputs.KSU_VERSION }}
+            Additional Features: ${{ github.event.inputs.ADDITIONAL }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Upload to Telegram
         if: github.event.inputs.UPLOAD_TO_TELEGRAM == 'true'
         run: |
           zipname="${{ steps.package.outputs.zipname }}"
           file_path="kernel_tree/$zipname"
-          
-          # Check file size (Telegram limit is 50MB)
-          file_size=$(stat -f%z "$file_path" 2>/dev/null || stat -c%s "$file_path")
-          if [ $file_size -gt 50000000 ]; then
-            echo "WARNING: File too large for Telegram (${file_size} bytes)"
-            exit 0
-          fi
-          
-          caption="<b>Redline-Kernel Build Complete</b>
-          
-          <b>Device:</b> ${{ matrix.device }}
-          <b>Version:</b> ${{ github.event.inputs.KERNEL_VERSION }}
-          <b>Build ID:</b> ${{ github.run_id }}
-          <b>KernelSU:</b> ${{ github.event.inputs.KSU_VERSION }}
-          <b>Features:</b> ${{ github.event.inputs.ADDITIONAL }}
-          
-          <b>Enabled Features:</b>
-          KSU: ${{ env.KSU_ENABLE == '1' && 'ENABLED' || 'DISABLED' }} | SuSFS: ${{ env.SuSFS_ENABLE == '1' && 'ENABLED' || 'DISABLED' }} | KPM: ${{ env.KPM_ENABLE == '1' && 'ENABLED' || 'DISABLED' }}
-          
-          <b>File:</b> <code>$zipname</code>
-          <b>Workflow:</b> https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          curl -f -X POST \
-            -F "chat_id=${{ secrets.TG_CHAT_ID }}" \
-            -F "document=@$file_path" \
-            -F "caption=$caption" \
-            -F "parse_mode=HTML" \
-            "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument" || {
-            echo "ERROR: Failed to upload to Telegram"
-            exit 1
-          }
-          
-          echo "Successfully uploaded to Telegram"
+          curl -s -X POST \
+            -F chat_id=${{ secrets.TG_CHAT_ID }} \
+            -F document=@$file_path \
+            -F caption="Redline Kernel Build
+          Device: ${{ matrix.device }}
+          Version: ${{ github.event.inputs.KERNEL_VERSION }}
+          Build ID: ${{ github.run_id }}
+          KernelSU: ${{ github.event.inputs.KSU_VERSION }}
+          Features: ${{ github.event.inputs.ADDITIONAL }}
+          File: $zipname" \
+          "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
