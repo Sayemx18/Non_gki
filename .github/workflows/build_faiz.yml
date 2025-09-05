@@ -455,7 +455,7 @@ jobs:
           ADDITIONAL_STR=""
           [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]] && ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
           
-          zipname="Redline_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}.zip"
+          zipname="Redline_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}.zip"
           
           cd anykernel
           zip -q -r "../$zipname" *
@@ -468,16 +468,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.package.outputs.zipname }}
-          path: kernel_tree/out/arch/arm64/boot/${{ steps.package.outputs.zipname }}
+          path: kernel_tree/${{ steps.package.outputs.zipname }}
           retention-days: 30
 
       - name: Create GitHub Release
         if: github.event.inputs.UPLOAD_TO_RELEASE == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          files: kernel_tree/out/arch/arm64/boot/${{ steps.package.outputs.zipname }}
+          files: kernel_tree/${{ steps.package.outputs.zipname }}
           tag_name: v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
-          name: ${{ github.event.inputs.BUILD_TITLE || format('N0Kernel v{0}', github.event.inputs.KERNEL_VERSION) }}
+          name: ${{ github.event.inputs.BUILD_TITLE || format('Redline v{0}', github.event.inputs.KERNEL_VERSION) }}
           body: |
             ## N0Kernel Build Information
             
@@ -503,7 +503,7 @@ jobs:
         if: github.event.inputs.UPLOAD_TO_TELEGRAM == 'true'
         run: |
           zipname="${{ steps.package.outputs.zipname }}"
-          file_path="kernel_tree/out/arch/arm64/boot/$zipname"
+          file_path="kernel_tree/$zipname"
           
           # Check file size (Telegram limit is 50MB)
           file_size=$(stat -f%z "$file_path" 2>/dev/null || stat -c%s "$file_path")
@@ -512,7 +512,7 @@ jobs:
             exit 0
           fi
           
-          caption="<b>N0Kernel Build Complete</b>
+          caption="<b>Redline-Kernel Build Complete</b>
           
           <b>Device:</b> ${{ matrix.device }}
           <b>Version:</b> ${{ github.event.inputs.KERNEL_VERSION }}
