@@ -133,8 +133,23 @@ jobs:
           tar -xzf Clang-20.0.0git-20250129.tar.gz -C zyc-clang
           rm Clang-20.0.0git-20250129.tar.gz
 
-      - name: Add toolchain to PATH
-        run: echo "${GITHUB_WORKSPACE}/zyc-clang/bin" >> $GITHUB_PATH
+      - name: Set toolchain path
+        run: |
+          TOOLCHAIN_PATH=$(pwd)/toolchain/zyc-clang/bin
+          echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> $GITHUB_ENV
+          echo "$TOOLCHAIN_PATH" >> $GITHUB_PATH
+
+      - name: Verify toolchain setup
+        run: |
+          echo "Toolchain path: $TOOLCHAIN_PATH"
+          echo "Toolchain directory contents:"
+          ls -la $TOOLCHAIN_PATH | head -20
+          echo "PATH: $PATH"
+          echo "Checking for required tools:"
+          which clang
+          which ld.lld  
+          which llvm-ar
+          which llvm-objdump
           
       - name: Set Environment Variables
         run: |
