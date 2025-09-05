@@ -132,6 +132,9 @@ jobs:
           wget https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz
           tar -xzf Clang-20.0.0git-20250129.tar.gz -C zyc-clang
           rm Clang-20.0.0git-20250129.tar.gz
+
+      - name: Add toolchain to PATH
+        run: echo "${GITHUB_WORKSPACE}/zyc-clang/bin" >> $GITHUB_PATH
           
       - name: Set Environment Variables
         run: |
@@ -227,11 +230,19 @@ jobs:
           
       - name: Build Kernel
         run: |
-          export PATH="$(pwd)/zyc-clang/bin:$PATH"
+          export LD_LIBRARY_PATH="${GITHUB_WORKSPACE}/zyc-clang/lib:$LD_LIBRARY_PATH"
           export CCACHE_DIR="$HOME/.cache/ccache"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           
           cd kernel_tree
+
+          # Verify toolchain installation
+          echo "Verifying toolchain..."
+          which clang || echo "clang not found in PATH"
+          which ld.lld || echo "ld.lld not found in PATH"
+          which llvm-objdump || echo "llvm-objdump not found in PATH"
+          which llvm-ar || echo "llvm-ar not found in PATH"
+          
           
           # Get git commit info
           GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
