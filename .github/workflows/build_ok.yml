@@ -1,5 +1,5 @@
-# KSU Kernel Build Workflow
-name: N0 WITH DIFFERENT KSU VARIENTS
+# KSU Kernel Build Workflow with KPM Support
+name: Redline V2
 
 on:
   pull_request:
@@ -9,14 +9,14 @@ on:
         description: 'Custom Build Title'
         required: false
         type: string
-      KERNEL_TREE_1:
-        description: 'Kernel Tree 1'
-        default: 'https://github.com/EmanuelCN/kernel_xiaomi_sm8250'
+      KERNEL_TREE:
+        description: 'Kernel Repository URL'
+        default: 'https://github.com/PocoF3Releases/kernel_xiaomi_sm8250'
         required: true
         type: string
-      KERNEL_TREE_BRANCH_1:
-        description: 'Kernel Tree Branch 1'
-        default: 'staging'
+      KERNEL_BRANCH:
+        description: 'Kernel Branch'
+        default: 'aosp-16'
         required: true
         type: string
       CODENAME:
@@ -29,11 +29,6 @@ on:
           - 'all'
         default: 'alioth'
         required: true
-      KERNEL_VERSION:
-        description: 'Custom Kernel Version (e.g., 16.4.0, 16.4.1)'
-        default: '16.4.0'
-        required: true
-        type: string
       KSU_VERSION:
         description: 'KernelSU Version'
         type: choice
@@ -55,31 +50,18 @@ on:
           - 'susfs-kpm'
         default: 'none'
         required: false
-      ANYKERNEL_URL:
-        description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
-        default: 'https://github.com/Sayemx18/AKalioth'
-        required: false
-        type: string
       UPLOAD_TO_TELEGRAM:
         description: 'Upload to Telegram'
-        type: choice
-        options:
-          - 'no'
-          - 'yes'
-        default: 'no'
-        required: false
+        type: boolean
+        default: false
       UPLOAD_TO_RELEASE:
         description: 'Upload to GitHub Release'
-        type: choice
-        options:
-          - 'no'
-          - 'yes'
-        default: 'no'
-        required: false
+        type: boolean
+        default: false
 
 jobs:
   setup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -94,290 +76,304 @@ jobs:
 
   build:
     needs: setup
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         device: ${{ fromJson(needs.setup.outputs.matrix) }}
-    env:
-      UPLOAD_TO_RELEASE: false
 
     steps:
       - name: Install Dependencies
         run: |
+          sudo apt-get update -y 
+          sudo apt-get install -y \
+          build-essential git curl wget bison flex zip bc \
+          cpio libssl-dev libncurses-dev gcc \
+          python3 python3-pip ccache lld
           sudo apt update
-          sudo apt install -y flex libncurses6 bc bison build-essential ccache curl file git kmod libelf-dev libssl-dev libudev-dev libpci-dev libiberty-dev autoconf llvm lld
+          sudo apt install -y software-properties-common
+          apt policy python2
+          sudo apt install -y python2
+          python2 --version
+          curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+          sudo python2.7 get-pip.py
+          pip2.7 --version
 
+      - name: Install LLVM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-14 clang-14
+          sudo ln -s /usr/bin/llvm-nm-14 /usr/bin/llvm-nm
+          sudo ln -s /usr/bin/llvm-objcopy-14 /usr/bin/llvm-objcopy
+          sudo ln -s /usr/bin/llvm-objdump-14 /usr/bin/llvm-objdump
+          sudo ln -s /usr/bin/llvm-strip-14 /usr/bin/llvm-strip
+          
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ github.workflow }}-${{ github.job }}-${{ matrix.device }}
+          max-size: 2G
 
-      - name: Download & Extract Clang
+      - name: Cache ZyCromerZ Clang
+        uses: actions/cache@v4
+        id: clang-cache
+        with:
+          path: toolchain/zyc-clang
+          key: ${{ runner.os }}-zyc-clang-20.0.0git-20250129
+
+      - name: Download ZyCromerZ Clang Toolchain
+        if: steps.clang-cache.outputs.cache-hit != 'true'
         run: |
-          wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
-          mkdir clang
-          unzstd -d clang.tar.zst
-          tar -xf clang.tar -C clang
-          
-      - name: Set Kernel Environment Variables
+          mkdir -p toolchain/zyc-clang; cd toolchain
+          wget https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz
+          tar -xzf Clang-20.0.0git-20250129.tar.gz -C zyc-clang
+          rm Clang-20.0.0git-20250129.tar.gz
+
+      - name: Set toolchain path
         run: |
-          echo "KERNEL_TREE=${{ github.event.inputs.KERNEL_TREE_1 }}" >> $GITHUB_ENV
-          echo "KERNEL_TREE_BRANCH=${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}" >> $GITHUB_ENV
-          echo "CODENAME=${{ matrix.device }}" >> $GITHUB_ENV
-          echo "KSU_VERSION=${{ github.event.inputs.KSU_VERSION }}" >> $GITHUB_ENV
-          echo "ADDITIONAL=${{ github.event.inputs.ADDITIONAL }}" >> $GITHUB_ENV
-          echo "KERNEL_VERSION=${{ github.event.inputs.KERNEL_VERSION }}" >> $GITHUB_ENV
+          TOOLCHAIN_PATH=$(pwd)/toolchain/zyc-clang/bin
+          echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> $GITHUB_ENV
+          echo "$TOOLCHAIN_PATH" >> $GITHUB_PATH
+
+      - name: Verify toolchain setup
+        run: |
+          echo "Toolchain path: $TOOLCHAIN_PATH"
+          echo "Toolchain directory contents:"
+          ls -la $TOOLCHAIN_PATH | head -20
+          echo "PATH: $PATH"
+          echo "Checking for required tools:"
+          which clang
+          which ld.lld  
+          which llvm-ar
+          which llvm-objdump
           
-          # Set feature flags
-          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "ksu" || "${{ github.event.inputs.KSU_VERSION }}" == "rksu" || "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" || "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
-            echo "KSU_ENABLE=1" >> $GITHUB_ENV
-          else
-            echo "KSU_ENABLE=0" >> $GITHUB_ENV
-          fi
+      - name: Set Environment Variables
+        run: |
+          # Feature flags
+          KSU_ENABLE=$([[ "${{ github.event.inputs.KSU_VERSION }}" =~ ^(ksu|rksu|sukisu|sukisu-ultra)$ ]] && echo 1 || echo 0)
+          SuSFS_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (susfs|susfs-kpm) ]] && echo 1 || echo 0)
+          KPM_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (kpm|susfs-kpm) ]] && echo 1 || echo 0)
           
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs-kmp" ]]; then
-            echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
-            echo "KMP_ENABLE=1" >> $GITHUB_ENV
-          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs" ]]; then
-            echo "SuSFS_ENABLE=1" >> $GITHUB_ENV
-            echo "KMP_ENABLE=0" >> $GITHUB_ENV
-          elif [[ "${{ github.event.inputs.ADDITIONAL }}" == "kmp" ]]; then
-            echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
-            echo "KMP_ENABLE=1" >> $GITHUB_ENV
-          else
-            echo "SuSFS_ENABLE=0" >> $GITHUB_ENV
-            echo "KMP_ENABLE=0" >> $GITHUB_ENV
-          fi
+          echo "KSU_ENABLE=$KSU_ENABLE" >> $GITHUB_ENV
+          echo "SuSFS_ENABLE=$SuSFS_ENABLE" >> $GITHUB_ENV
+          echo "KPM_ENABLE=$KPM_ENABLE" >> $GITHUB_ENV
           
-          # Set KSU ZIP string
+          # Set KSU ZIP string based on configuration
           case "${{ github.event.inputs.KSU_VERSION }}" in
             "ksu")
-              echo "KSU_ZIP_STR=KernelSU" >> $GITHUB_ENV
+              KSU_ZIP_STR="KernelSU"
               ;;
             "rksu")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs"* ]]; then
-                echo "KSU_ZIP_STR=RKSU_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=RKSU" >> $GITHUB_ENV
-              fi
+              KSU_ZIP_STR="RKSU"
+              [[ $SuSFS_ENABLE -eq 1 ]] && KSU_ZIP_STR="${KSU_ZIP_STR}_SuSFS"
               ;;
             "sukisu")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs"* ]]; then
-                echo "KSU_ZIP_STR=SukiSU_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=SukiSU" >> $GITHUB_ENV
-              fi
+              KSU_ZIP_STR="SukiSU"
+              [[ $SuSFS_ENABLE -eq 1 ]] && KSU_ZIP_STR="${KSU_ZIP_STR}_SuSFS"
               ;;
             "sukisu-ultra")
-              if [[ "${{ github.event.inputs.ADDITIONAL }}" == "susfs"* ]]; then
-                echo "KSU_ZIP_STR=SukiSU-Ultra_SuSFS" >> $GITHUB_ENV
-              else
-                echo "KSU_ZIP_STR=SukiSU-Ultra" >> $GITHUB_ENV
-              fi
+              KSU_ZIP_STR="SukiSU-Ultra"
+              [[ $SuSFS_ENABLE -eq 1 ]] && KSU_ZIP_STR="${KSU_ZIP_STR}_SuSFS"
               ;;
             *)
-              echo "KSU_ZIP_STR=NoKernelSU" >> $GITHUB_ENV
+              KSU_ZIP_STR="NoKernelSU"
               ;;
           esac
           
-      - name: Clone kernel source 
-        id: kernel
-        run: |
-          # Clone the original source
-          git clone $KERNEL_TREE -b $KERNEL_TREE_BRANCH kernel_tree
+          # Add KPM suffix if enabled
+          [[ $KPM_ENABLE -eq 1 ]] && KSU_ZIP_STR="${KSU_ZIP_STR}_KPM"
           
-      - name: Apply Patches
-        run: |
-          cd kernel_tree
-          git submodule deinit -f drivers/kernelsu
-          git rm -f drivers/kernelsu
-          rm -rf .git/modules/drivers/kernelsu
-          git submodule deinit -f KernelSU || true
-          git rm -rf --cached KernelSU || true
-          rm -rf KernelSU
-          rm -rf .git/modules/KernelSU
-          sed -i '/KernelSU/d' .gitmodules || true 
+          echo "KSU_ZIP_STR=$KSU_ZIP_STR" >> $GITHUB_ENV
           
+      - name: Clone Kernel Source
+        run: |
+          git clone ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.KERNEL_BRANCH }} kernel_tree
 
-      - name: Setup KernelSU
+      - name: Create Mkdtboimg and Susfs Patches From My Fork
         run: |
           cd kernel_tree
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git remote add myfork https://github.com/Sayemx18/kernel_xiaomi_sm8250
+          git fetch myfork susfs-v1.5.9 --depth=100
+          git cherry-pick 2e0fff3c572a1f514b50c271e6fc320ded80b22a
+          git cherry-pick 951a13039fbfff9b29627f572fd41e7a960bec52
+          git cherry-pick 80c8fb83ac50d233f5e35716bb9cb828f49a3a3f
+          git cherry-pick 39487297fe69807e567de37b24fa8562ee3f7875
+          git cherry-pick 743ec966a37c293998495df8bd0f7924200050f1
+          git cherry-pick b3d2cc52af9d981e1237d3b19e2a565ff3f34994
+          git cherry-pick ec5609837fc6e2720366622bec4ed8a2b6effabe
+          git cherry-pick 83ef4101a6f604030e2548664c6e788298b94649
+          git cherry-pick 764dd59c897f86952aef18a5adb35c3f07846825
+          git cherry-pick b77ec4ec0b7dd6175fa503b54c1faeedd01ecc9b
+          git cherry-pick 2a882b098bc4ee8c99ebca48e457611a2b18583a
+          git cherry-pick 267a5141a70d022ddb0bfdeed0d5788f8f513389
+          git cherry-pick 21052d299fe9710037eac6b142f0f941312b3b79
+          git cherry-pick e3de16bff529291ac6f76abcdc870c2c13da44cd
+          git cherry-pick 00caebcb9e5b24ed9a39c58e9e4d3b5a31ab7dea
+          git cherry-pick cec10f367fc357037c708a1e93d8ff9b506da684
+          
+      - name: Setup KernelSU
+        if: env.KSU_ENABLE == '1'
+        run: |
+          cd kernel_tree
+          
+          # Validate KSU + SuSFS compatibility
+          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "ksu" && "$SuSFS_ENABLE" -eq 1 ]]; then
+            echo "ERROR: Official KernelSU does not support SuSFS"
+            exit 1
+          fi
           
           case "${{ github.event.inputs.KSU_VERSION }}" in
             "ksu")
-              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "Official KernelSU does not support SuSFS"
-                exit 1
-              fi
               echo "Setting up Official KernelSU"
               curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
               ;;
             "rksu")
               echo "Setting up RKSU"
               if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "RKSU with SuSFS enabled"
                 curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-v1.5.5
               else
-                echo "RKSU without SuSFS"
                 curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
               fi
               ;;
             "sukisu")
               echo "Setting up SukiSU"
               if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "SukiSU with SuSFS enabled"
                 curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s susfs-dev
               else
-                echo "SukiSU without SuSFS"
                 curl -LSs "https://raw.githubusercontent.com/ShirkNeko/KernelSU/main/kernel/setup.sh" | bash -s dev
               fi
               ;;
             "sukisu-ultra")
               echo "Setting up SukiSU-Ultra"
               if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
-                echo "SukiSU-Ultra with SuSFS enabled"
                 curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
               else
-                echo "SukiSU-Ultra without SuSFS"
                 curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
               fi
               ;;
-            *)
-              echo "KernelSU is disabled"
-              ;;
           esac
+
+      - name: Apply KPM Patch (Pre-build)
+        if: env.KPM_ENABLE == '1' && github.event.inputs.KSU_VERSION == 'sukisu-ultra'
+        run: |
+          cd kernel_tree
+          echo "Preparing KPM patch for SukiSU-Ultra"
+          # KPM patch will be applied post-build for SukiSU-Ultra
+          echo "KPM patch will be applied after kernel build"
           
       - name: Build Kernel
         run: |
-          export PATH="$(pwd)/clang/bin:$PATH"
-          export ARCH=arm64
-          export SUBARCH=ARM64
+          export LD_LIBRARY_PATH="${GITHUB_WORKSPACE}/zyc-clang/lib:$LD_LIBRARY_PATH"
+          export CCACHE_DIR="$HOME/.cache/ccache"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           
-          # Setup ccache
-          export CCACHE_DIR="$HOME/.cache/ccache"
-          export CC="ccache clang"
-          export CXX="ccache clang++"
-          
           cd kernel_tree
+
+          # Verify toolchain installation
+          echo "Verifying toolchain..."
+          which clang || echo "clang not found in PATH"
+          which ld.lld || echo "ld.lld not found in PATH"
+          which llvm-objdump || echo "llvm-objdump not found in PATH"
+          which llvm-ar || echo "llvm-ar not found in PATH"
+          
           
           # Get git commit info
           GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
           echo "GIT_COMMIT_ID=$GIT_COMMIT_ID" >> $GITHUB_ENV
           
-          # Update defconfig with custom version, date and commit ID
+          # Update defconfig version string
           local_version_str="-perf"
           local_version_date_str="-v${{ github.event.inputs.KERNEL_VERSION }}-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
-          sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/vendor/${{ matrix.device }}_defconfig
+          sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${{ matrix.device }}_defconfig
           
-          # Build kernel config
-          make O=out vendor/${{ matrix.device }}_defconfig
-          
-          # Configure KSU and additional features
-          if [ "$KSU_ENABLE" -eq 1 ]; then
-              # Check if KernelSU was properly set up before enabling it
-              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
-                  scripts/config --file out/.config -e KSU
-                  echo "KSU enabled in config"
-              else
-                  echo "Warning: KernelSU files not found, disabling KSU"
-                  scripts/config --file out/.config -d KSU
-                  echo "KSU disabled due to missing files"
-              fi
-          else
-              scripts/config --file out/.config -d KSU
-              echo "KSU disabled in config"
-          fi
-
-          # Enable KSU_MANUAL_HOOK for sukisu-ultra and other KSU variants
-          if [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "sukisu" ]] || [[ "${{ github.event.inputs.KSU_VERSION }}" == "rksu" ]] || [[ "$KSU_ENABLE" -eq 1 ]]; then
-              # Only enable if KSU was properly set up
-              if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
-                  scripts/config --file out/.config -e KSU_MANUAL_HOOK
-                  echo "KSU_MANUAL_HOOK enabled"
-              else
-                  echo "Warning: KernelSU not properly set up, skipping KSU_MANUAL_HOOK"
-              fi
-          else
-              echo "KSU_MANUAL_HOOK not needed for ${{ github.event.inputs.KSU_VERSION }}"
-          fi
-
-          # Configure KPM
-          if [ "$KMP_ENABLE" -eq 1 ]; then
-              scripts/config --file out/.config \
-                  -e KPM \
-                  -e KALLSYMS \
-                  -e KALLSYMS_ALL
-              echo "KPM features enabled"
-          else 
-              scripts/config --file out/.config \
-                  -d KPM \
-                  -d KALLSYMS \
-                  -d KALLSYMS_ALL
-              echo "KPM features disabled"
-          fi
-
-          # Configure SuSFS
-          if [ "$SuSFS_ENABLE" -eq 1 ]; then
-              scripts/config --file out/.config \
-                  -e KSU_SUSFS \
-                  -e KSU_SUSFS_HAS_MAGIC_MOUNT \
-                  -e KSU_SUSFS_SUS_PATH \
-                  -e KSU_SUSFS_SUS_MOUNT \
-                  -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
-                  -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
-                  -e KSU_SUSFS_SUS_KSTAT \
-                  -e KSU_SUSFS_TRY_UMOUNT \
-                  -e KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
-                  -e KSU_SUSFS_SPOOF_UNAME \
-                  -e KSU_SUSFS_ENABLE_LOG \
-                  -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
-                  -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
-                  -e KSU_SUSFS_OPEN_REDIRECT
-              echo "SuSFS features enabled"
-          else
-              scripts/config --file out/.config \
-                  -d KSU_SUSFS \
-                  -d KSU_SUSFS_HAS_MAGIC_MOUNT \
-                  -d KSU_SUSFS_SUS_PATH \
-                  -d KSU_SUSFS_SUS_MOUNT \
-                  -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
-                  -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
-                  -d KSU_SUSFS_SUS_KSTAT \
-                  -d KSU_SUSFS_TRY_UMOUNT \
-                  -d KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
-                  -d KSU_SUSFS_SPOOF_UNAME \
-                  -d KSU_SUSFS_ENABLE_LOG \
-                  -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
-                  -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
-                  -d KSU_SUSFS_OPEN_REDIRECT
-              echo "SuSFS features disabled"
-          fi
-          
-          # Debug: Show final KSU configuration
-          echo "=== Final KSU Configuration ==="
-          echo "KSU_ENABLE: $KSU_ENABLE"
-          echo "KSU_VERSION: ${{ github.event.inputs.KSU_VERSION }}"
-          echo "Checking KSU config options in .config:"
-          if grep -q "CONFIG_KSU=y" out/.config 2>/dev/null; then
-            echo "✓ CONFIG_KSU=y found"
-          else
-            echo "✗ CONFIG_KSU not enabled or not found"
-          fi
-          if grep -q "CONFIG_KSU_MANUAL_HOOK=y" out/.config 2>/dev/null; then
-            echo "✓ CONFIG_KSU_MANUAL_HOOK=y found"
-          else
-            echo "✗ CONFIG_KSU_MANUAL_HOOK not enabled or not found"
-          fi
-          echo "=== End KSU Configuration ==="
-          
-          # Build the kernel
+          # Configure kernel
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
             LLVM=1 \
             LLVM_IAS=1 \
-            CC=clang \
+            CC="ccache clang" \
+            HOSTCC=gcc \
+            HOSTCFLAGS="-O2 -Wall" \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            ${{ matrix.device }}_defconfig
+
+          # Configure features
+          if [ "$KSU_ENABLE" -eq 1 ]; then
+            if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+              scripts/config --file out/.config -e KSU
+              echo "KSU enabled"
+            else
+              echo "WARNING: KernelSU files not found, disabling KSU"
+              scripts/config --file out/.config -d KSU
+            fi
+          else
+            scripts/config --file out/.config -d KSU
+            echo "KSU disabled"
+          fi
+
+          # Enable KSU_MANUAL_HOOK for compatible variants
+          if [[ "${{ github.event.inputs.KSU_VERSION }}" =~ ^(sukisu|sukisu-ultra|rksu)$ && "$KSU_ENABLE" -eq 1 ]]; then
+            if [[ -f "drivers/kernelsu/Kconfig" ]] || [[ -d "KernelSU" ]]; then
+              scripts/config --file out/.config -e KSU_MANUAL_HOOK
+              echo "KSU_MANUAL_HOOK enabled"
+            fi
+          fi
+
+          # Configure KPM
+          if [ "$KPM_ENABLE" -eq 1 ]; then
+            scripts/config --file out/.config \
+              -e KPM \
+              -e KALLSYMS \
+              -e KALLSYMS_ALL
+            echo "KPM enabled with KALLSYMS"
+          else
+            scripts/config --file out/.config \
+              -d KPM \
+              -d KALLSYMS \
+              -d KALLSYMS_ALL
+            echo "KPM disabled"
+          fi
+
+          # Configure SuSFS
+          if [ "$SuSFS_ENABLE" -eq 1 ]; then
+            scripts/config --file out/.config \
+              -e KSU_SUSFS \
+              -e KSU_SUSFS_HAS_MAGIC_MOUNT \
+              -e KSU_SUSFS_SUS_MOUNT \
+              -e KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+              -e KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
+              -e KSU_SUSFS_SUS_KSTAT \
+              -e KSU_SUSFS_SPOOF_UNAME \
+              -e KSU_SUSFS_ENABLE_LOG \
+              -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+              -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+            echo "SuSFS features enabled"
+          else
+            scripts/config --file out/.config \
+              -d KSU_SUSFS \
+              -d KSU_SUSFS_HAS_MAGIC_MOUNT \
+              -d KSU_SUSFS_SUS_MOUNT \
+              -d KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
+              -d KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
+              -d KSU_SUSFS_SUS_KSTAT \
+              -d KSU_SUSFS_SPOOF_UNAME \
+              -d KSU_SUSFS_ENABLE_LOG \
+              -d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+              -d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+            echo "SuSFS features disabled"
+          fi
+          
+          echo "Starting kernel build..."
+          make O=out \
+            ARCH=arm64 \
+            SUBARCH=arm64 \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CC="ccache clang" \
             HOSTCC=gcc \
             HOSTCFLAGS="-O2 -Wall" \
             CROSS_COMPILE=aarch64-linux-gnu- \
@@ -385,133 +381,113 @@ jobs:
             CLANG_TRIPLE=aarch64-linux-gnu- \
             -j$(nproc --all)
 
-      - name: Apply KPM Patch
-        if: ${{ github.event.inputs.ANYKERNEL_URL != '' }}
+      - name: Apply KPM Patch (Post-build)
+        if: env.KPM_ENABLE == '1' && github.event.inputs.KSU_VERSION == 'sukisu-ultra'
+        run: |
+          cd kernel_tree/out/arch/arm64/boot
+          echo "Applying KPM patch to built Image..."
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod +x patch
+          
+          # Backup original image
+          cp Image oImage
+          
+          ./patch
+          if [ $? -eq 0 ]; then
+            rm -f Image
+            mv oImage Image
+            echo "KPM patch applied successfully"
+          else
+            echo "WARNING: KPM patch failed, using original Image"
+            rm -f oImage
+          fi
+
+      - name: Verify Build
+        run: |
+          cd kernel_tree
+          if [ -f "out/arch/arm64/boot/Image" ] || [ -f "out/arch/arm64/boot/Image" ]; then
+            echo "Build successful: Kernel image found"
+            ls -la out/arch/arm64/boot/Image*
+          else
+            echo "ERROR: Build failed: No kernel image found"
+            exit 1
+          fi
+
+      - name: Package with AnyKernel3
+        if: success()
         run: |
           cd kernel_tree
           
-          # Check if build was successful
-          if [ -f "out/arch/arm64/boot/Image.gz" ]; then
-              echo "Build successful: Image.gz found"
+          echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/Sayemx18/AnyKernel3)"
+          git clone https://github.com/Sayemx18/AnyKernel3 -b main --single-branch --depth=1 anykernel
+          
+          echo "Generating [out/arch/arm64/boot/dtb]......"
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+
+          cp out/arch/arm64/boot/Image anykernel/
+          cp out/arch/arm64/boot/dtb anykernel/
+
+          if [ -f "out/arch/arm64/boot/dtbo.img" ]; then
+            cp out/arch/arm64/boot/dtbo.img anykernel/
+            echo "DTBO included in flashable package"
+            # Show DTBO size
+            dtbo_size=$(ls -lh "out/arch/arm64/boot/dtbo.img" | awk '{print $5}')
+            echo "DTBO size: $dtbo_size"
           else
-              echo "Build failed: Image.gz not found"
-              exit 1
+            echo "No DTBO found (this is normal if device doesn't use overlays)"
           fi
           
-          # Apply KPM patch if needed
-          if [[ "$KMP_ENABLE" -eq 1 && "${{ github.event.inputs.KSU_VERSION }}" == "sukisu-ultra" ]]; then
-              echo "Applying KPM patch..."
-              cd out/arch/arm64/boot
-              curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
-              chmod +x patch
-              ./patch
-              if [ $? -eq 0 ]; then
-                  rm -f Image
-                  mv oImage Image
-                  echo "KPM patch applied successfully"
-              else
-                  echo "KMP Patch Failed, using original Image"
-              fi
-          fi
-
-      - name: AnyKernel3
-        if: success()
-        run: |
-          case "${{ matrix.device }}" in
-            "alioth")
-              echo "Cloning AnyKernel3 for alioth"
-              git clone --recursive --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
-              ;;
-            "apollo")
-              echo "Cloning AnyKernel3 for apollo"
-              git clone --recursive --depth=1 https://github.com/Sayemx18/AKapollo -b main AnyKernel3
-              ;;
-            "munch")
-              echo "Cloning AnyKernel3 for munch" 
-              git clone --recursive --depth=1 https://github.com/Sayemx18/AKmunch -b main AnyKernel3
-              ;;
-            *)
-              echo "Unknown device: ${{ matrix.device }}. Using default AnyKernel3 for alioth..."
-              git clone --recursive --depth=1 https://github.com/Sayemx18/AKalioth -b main AnyKernel3
-              ;;
-          esac
-          if [ -e "Image.gz" ]; then
-            cp -f Image.gz AnyKernel3
-          fi
-          if [ -e "dtb.img" ]; then
-            mv -f dtb.img dtb
-            cp -f dtb AnyKernel3/dtb
-          fi
-          if [ -e "dtbo.img" ]; then
-            cp -f dtbo.img AnyKernel3
-          fi
+          # Create filename
           build_date=$(date +"%Y%m%d-%H%M%S")
           ADDITIONAL_STR=""
-          if [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]]; then
-            ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
-          fi
-          name="N0Kernel_v${{ github.event.inputs.KERNEL_VERSION }}_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}_anykernel3.zip"
-        
-          cd AnyKernel3
-          zip -q -r $name *
-          mv $name ../
-          echo "zipname=$name" >> $GITHUB_OUTPUT
-        working-directory: kernel_tree/out/arch/arm64/boot/
-        id: anykernel
+          [[ "${{ github.event.inputs.ADDITIONAL }}" != "none" ]] && ADDITIONAL_STR="_${{ github.event.inputs.ADDITIONAL }}"
+          
+          zipname="Redline_${{ matrix.device }}_${KSU_ZIP_STR}${ADDITIONAL_STR}_${build_date}.zip"
+          
+          cd anykernel
+          zip -q -r "../$zipname" *
+          
+          echo "zipname=$zipname" >> $GITHUB_OUTPUT
+          echo "Package created: $zipname"
+        id: package
 
-      - name: Upload Flashable Kernel Zip
-        if: ${{ github.event.inputs.ANYKERNEL_URL != '' }}
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.anykernel.outputs.zipname }}
-          path: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
+          name: ${{ steps.package.outputs.zipname }}
+          path: kernel_tree/${{ steps.package.outputs.zipname }}
+          retention-days: 30
 
-      - name: Upload to Release (if enabled)
-        if: ${{ github.event.inputs.UPLOAD_TO_RELEASE == 'yes' && github.event.inputs.ANYKERNEL_URL != '' }}
+      - name: Create GitHub Release
+        if: github.event.inputs.UPLOAD_TO_RELEASE == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          files: kernel_tree/out/arch/arm64/boot/${{ steps.anykernel.outputs.zipname }}
-          name: ${{ github.event.inputs.BUILD_TITLE || format('N0Kernel v{0} - Multi-Device Build', github.event.inputs.KERNEL_VERSION) }}
+          files: kernel_tree/${{ steps.package.outputs.zipname }}
           tag_name: v${{ github.event.inputs.KERNEL_VERSION }}-${{ github.run_id }}
+          name: ${{ github.event.inputs.BUILD_TITLE
           body: |
-            **N0Kernel v${{ github.event.inputs.KERNEL_VERSION }} Build**
-            
-            **Build Configuration:**
-            - **Device:** ${{ matrix.device }}
-            - **Version:** ${{ github.event.inputs.KERNEL_VERSION }}
-            - **KernelSU:** ${{ github.event.inputs.KSU_VERSION }}
-            - **Additional Features:** ${{ github.event.inputs.ADDITIONAL }}
-            - **Kernel Tree:** ${{ github.event.inputs.KERNEL_TREE_1 }}
-            - **Branch:** ${{ github.event.inputs.KERNEL_TREE_BRANCH_1 }}
-            
-            **Device Support:**
-            - **alioth:** Redmi K40 / POCO F3
-            - **apollo:** Xiaomi Mi 10T / Mi 10T Pro
-            - **munch:** POCO F4
-            
-            **Download:** `${{ steps.anykernel.outputs.zipname }}`
-            
-            **Installation:**
-            1. Download the ZIP file for your device
-            2. Boot into custom recovery (TWRP/OrangeFox)
-            3. Flash the kernel ZIP
-            4. Reboot and enjoy!
-            
-            ---
-            *Built with GitHub Actions*
+            Device: ${{ matrix.device }}
+            Kernel Version: ${{ github.event.inputs.KERNEL_VERSION }}
+            Build ID: ${{ github.run_id }}
+            KernelSU: ${{ github.event.inputs.KSU_VERSION }}
+            Additional Features: ${{ github.event.inputs.ADDITIONAL }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Kernel to Telegram
-        if: ${{ github.event.inputs.UPLOAD_TO_TELEGRAM == 'yes' && github.event.inputs.ANYKERNEL_URL != '' }}
+      - name: Upload to Telegram
+        if: github.event.inputs.UPLOAD_TO_TELEGRAM == 'true'
         run: |
-          FILE="${{ steps.anykernel.outputs.zipname }}"
-          CAPTION="N0Kernel build completed 
-          Device: ${{ matrix.device }}
-          File: $FILE"
+          zipname="${{ steps.package.outputs.zipname }}"
+          file_path="kernel_tree/$zipname"
 
-          curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
-          -F document=@kernel_tree/out/arch/arm64/boot/$FILE \
-          -F caption="$CAPTION" \
-          -F parse_mode="HTML" \
+          curl -s -X POST \
+            -F chat_id=${{ secrets.TG_CHAT_ID }} \
+            -F document=@$file_path \
+            -F caption="Redline Kernel Build
+          Device: ${{ matrix.device }}
+          Version: ${{ github.event.inputs.KERNEL_VERSION }}
+          Build ID: ${{ github.run_id }}
+          KernelSU: ${{ github.event.inputs.KSU_VERSION }}
+          Features: ${{ github.event.inputs.ADDITIONAL }}
+          File: $zipname" \
           "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
