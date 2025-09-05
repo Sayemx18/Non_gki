@@ -199,7 +199,7 @@ jobs:
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git remote add myfork https://github.com/Sayemx18/kernel_xiaomi_sm8250
-          git fetch myfork susfs-v1.5.9 --depth=30
+          git fetch myfork susfs-v1.5.9 --depth=100
           git cherry-pick 2e0fff3c572a1f514b50c271e6fc320ded80b22a
           git cherry-pick 951a13039fbfff9b29627f572fd41e7a960bec52
           git cherry-pick 80c8fb83ac50d233f5e35716bb9cb828f49a3a3f
