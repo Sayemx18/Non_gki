@@ -134,6 +134,14 @@ jobs:
           echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> $GITHUB_ENV
           echo "$TOOLCHAIN_PATH" >> $GITHUB_PATH
 
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache_mikernel
+          key: ${{ runner.os }}-ccache-${{ matrix.device }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.device }}-
+
       - name: Verify toolchain setup
         run: |
           echo "Toolchain path: $TOOLCHAIN_PATH"
