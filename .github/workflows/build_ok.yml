@@ -186,6 +186,8 @@ jobs:
             *)
               KSU_ZIP_STR="NoKernelSU"
               ;;
+              KSU_ZIP_STR="Next"
+              ;;
           esac
           
           # Add KPM suffix if enabled
