@@ -38,6 +38,7 @@ on:
           - 'rksu'
           - 'sukisu'
           - 'sukisu-ultra'
+          - 'next'
         default: 'sukisu-ultra'
         required: true
       ADDITIONAL:
@@ -157,7 +158,7 @@ jobs:
       - name: Set Environment Variables
         run: |
           # Feature flags
-          KSU_ENABLE=$([[ "${{ github.event.inputs.KSU_VERSION }}" =~ ^(ksu|rksu|sukisu|sukisu-ultra)$ ]] && echo 1 || echo 0)
+          KSU_ENABLE=$([[ "${{ github.event.inputs.KSU_VERSION }}" =~ ^(ksu|rksu|sukisu|sukisu-ultra|next)$ ]] && echo 1 || echo 0)
           SuSFS_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (susfs|susfs-kpm) ]] && echo 1 || echo 0)
           KPM_ENABLE=$([[ "${{ github.event.inputs.ADDITIONAL }}" =~ (kpm|susfs-kpm) ]] && echo 1 || echo 0)
           
@@ -258,6 +259,14 @@ jobs:
                 curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
               else
                 curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+              fi
+              ;;
+             "next")
+              echo "Setting up Next"
+              if [[ "$SuSFS_ENABLE" -eq 1 ]]; then
+                curl -LSs "https://raw.githubusercontent.com/Impqxr/KernelSU-Next/refs/heads/next-susfs/kernel/setup.sh" | bash -s next-susfs
+              else
+                curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
               fi
               ;;
           esac
