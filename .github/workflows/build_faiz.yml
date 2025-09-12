@@ -199,23 +199,9 @@ jobs:
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git remote add myfork https://github.com/Sayemx18/kernel_xiaomi_sm8250
-          git fetch myfork susfs-v1.5.9 --depth=100
-          git cherry-pick 2e0fff3c572a1f514b50c271e6fc320ded80b22a
-          git cherry-pick 951a13039fbfff9b29627f572fd41e7a960bec52
-          git cherry-pick 80c8fb83ac50d233f5e35716bb9cb828f49a3a3f
-          git cherry-pick 39487297fe69807e567de37b24fa8562ee3f7875
-          git cherry-pick 743ec966a37c293998495df8bd0f7924200050f1
-          git cherry-pick b3d2cc52af9d981e1237d3b19e2a565ff3f34994
-          git cherry-pick ec5609837fc6e2720366622bec4ed8a2b6effabe
-          git cherry-pick 83ef4101a6f604030e2548664c6e788298b94649
-          git cherry-pick 764dd59c897f86952aef18a5adb35c3f07846825
-          git cherry-pick b77ec4ec0b7dd6175fa503b54c1faeedd01ecc9b
-          git cherry-pick 2a882b098bc4ee8c99ebca48e457611a2b18583a
-          git cherry-pick 267a5141a70d022ddb0bfdeed0d5788f8f513389
-          git cherry-pick 21052d299fe9710037eac6b142f0f941312b3b79
-          git cherry-pick e3de16bff529291ac6f76abcdc870c2c13da44cd
-          git cherry-pick 00caebcb9e5b24ed9a39c58e9e4d3b5a31ab7dea
-          git cherry-pick cec10f367fc357037c708a1e93d8ff9b506da684
+          git fetch myfork susfsv-1.5.5 --depth=100
+          git cherry-pick 78e107cc55b3801c249baf53e731070a40e33c7d
+        
           
       - name: Setup KernelSU
         if: env.KSU_ENABLE == '1'
