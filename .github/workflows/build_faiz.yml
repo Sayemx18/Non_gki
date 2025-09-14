@@ -193,16 +193,6 @@ jobs:
         run: |
           git clone ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.KERNEL_BRANCH }} kernel_tree
 
-      - name: Create Mkdtboimg and Susfs Patches From My Fork
-        run: |
-          cd kernel_tree
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          git remote add myfork https://github.com/Sayemx18/kernel_xiaomi_sm8250
-          git fetch myfork susfsv-1.5.5 --depth=100
-          git cherry-pick 78e107cc55b3801c249baf53e731070a40e33c7d
-        
-          
       - name: Setup KernelSU
         if: env.KSU_ENABLE == '1'
         run: |
