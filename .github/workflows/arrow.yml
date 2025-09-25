@@ -92,6 +92,12 @@ jobs:
           tar -xzf clang-r574158.tar.gz -C aosp-clang
           rm clang-r574158.tar.gz
           ls -la aosp-clang/bin/ | head -10
+
+      - name: Set toolchain path
+        run: |
+          TOOLCHAIN_PATH=$(pwd)/toolchain/aosp-clang/bin
+          echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> $GITHUB_ENV
+          echo "$TOOLCHAIN_PATH" >> $GITHUB_PATH
           
           
       - name: Cache ccache
