@@ -1,0 +1,185 @@
+name: Build Kernel Aosp clang
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_device:
+        description: 'Target device'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'alioth'
+          - 'apollo'
+          - 'all'
+      release_tag:
+        description: 'Custom release tag (leave empty to auto-generate)'
+        required: false
+        default: ''
+      upload_to_telegram:
+        description: 'Upload kernel to Telegram?'
+        required: true
+        default: 'no'
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
+      upload_to_release:
+        description: 'Upload kernel to GitHub Release?'
+        required: true
+        default: 'yes'
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    outputs:
+      devices: ${{ steps.set-matrix.outputs.devices }}
+    steps:
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event.inputs.target_device }}" = "all" ]; then
+            echo 'devices=["alioth", "munch", "apollo"]' >> $GITHUB_OUTPUT
+          else
+            echo 'devices=["${{ github.event.inputs.target_device }}"]' >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJson(needs.prepare.outputs.devices) }}
+
+    steps:
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -y 
+          sudo apt-get install -y \
+          build-essential git curl wget bison flex zip bc \
+          cpio libssl-dev libncurses-dev gcc \
+          python3 python3-pip ccache
+          sudo apt update
+          sudo apt install -y software-properties-common
+          apt policy python2
+          sudo apt install -y python2
+          python2 --version
+          curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+          sudo python2.7 get-pip.py
+          pip2.7 --version
+
+      - name: Cache Aosp Clang
+        uses: actions/cache@v4
+        id: clang-cache
+        with:
+          path: toolchain/aosp-clang
+          key: ${{ runner.os }}-aosp-clang-r574158
+
+      - name: Download Aosp Clang Toolchain
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p toolchain/aosp-clang; cd toolchain
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/603a89415bbb04dff8bc577b95534479ec13fdc5/clang-r574158.tar.gz
+          tar -xzf clang-r574158.tar.gz -C aosp-clang
+          rm clang-r574158.tar.gz
+          ls -la aosp-clang/bin/ | head -10
+          
+          
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache_mikernel
+          key: ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-
+
+      - name: Clone Kernel Source
+        run: |
+          git clone --depth=1 https://github.com/Sayemx18/arrow_kernel_alioth -b upstream kernel_tree
+
+      - name: Build Kernel
+        run: |
+          
+          cd kernel_tree
+         
+          sed -i 's|TOOLCHAIN_PATH=\$HOME/toolchain/aosp-clang/bin|TOOLCHAIN_PATH=$(pwd)/toolchain/aosp-clang/bin|' bbuildd.sh
+          DEVICE="${{ matrix.device }}"
+          KSU_VERSION="${{ github.event.inputs.kernelsu_version }}"
+          ADDITIONAL_FUNCTION="${{ github.event.inputs.additional_function }}"
+          bash bbuildd.sh "$DEVICE"
+
+      - name: Set Kernel Path and Name
+        id: kernel-info
+        run: |
+          KernelPath=$(ls Arrow_*.zip 2>/dev/null | head -n 1 || true)
+          echo "KernelPath=$(pwd)/$KernelPath" >> $GITHUB_ENV
+          echo "KernelName=$KernelPath" >> $GITHUB_ENV
+          echo "kernel_name=$KernelPath" >> $GITHUB_OUTPUT
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ matrix.device }}
+          path: ${{ env.KernelPath }}
+          retention-days: 7
+
+      - name: Upload Kernel to Telegram (Individual)
+        if: ${{ github.event.inputs.upload_to_telegram == 'yes' }}
+        run: |
+          curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
+               -F document=@${{ env.KernelPath }} \
+               -F caption="Kernel for ${{ matrix.device }}" \
+               "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
+
+  
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.upload_to_release == 'yes' }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: kernels/
+
+      - name: Set Release Tag
+        id: release_tag
+        run: |
+          if [ -z "${{ github.event.inputs.release_tag }}" ]; then
+            if [ "${{ github.event.inputs.target_device }}" = "all" ]; then
+              TAG="all-devices-aosp-${{ github.run_number }}"
+            else
+              TAG="${{ github.event.inputs.target_device }}-aosp-${{ github.run_number }}"
+            fi
+          else
+            TAG="${{ github.event.inputs.release_tag }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Prepare Release Files
+        run: |
+          find kernels/ -name "*.zip" -exec cp {} . \;
+          ls -la *.zip
+
+      - name: Upload Kernels to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: ${{ steps.release_tag.outputs.tag }}
+          files: "*.zip"
+          body: |
+            ## Kernel Build Summary
+            - **Kernel Version**: ${{ github.event.inputs.kernel_version }}
+            - **Devices**: ${{ github.event.inputs.target_device }}
+            - **KernelSU**: ${{ github.event.inputs.kernelsu_version }}
+          
+           
+      
