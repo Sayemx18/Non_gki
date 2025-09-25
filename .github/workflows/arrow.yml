@@ -128,7 +128,7 @@ jobs:
       - name: Upload Kernel to Telegram (Individual)
         if: ${{ github.event.inputs.upload_to_telegram == 'yes' }}
         run: | 
-          ZIP_FILE=$(1s kernel_tree/Arrow_*.zip | head -1)
+          ZIP_FILE=$(ls kernel_tree/Arrow_*.zip | head -1)
           echo "Uploading: $ZIP_FILE"
           
           curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
