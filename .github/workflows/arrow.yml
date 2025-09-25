@@ -105,7 +105,13 @@ jobs:
         run: |
           
           cd kernel_tree
-         
+
+          export PATH="/usr/lib/ccache:$PATH"
+          export CC="ccache clang"
+          export CXX="ccache clang++"
+          ccache -M 5G
+          ccache -s
+          
           sed -i "s|TOOLCHAIN_PATH=\$HOME/toolchain/aosp-clang/bin|TOOLCHAIN_PATH=$(pwd)/../toolchain/aosp-clang/bin|" bbuildd.sh
           DEVICE="${{ matrix.device }}"
           KSU_VERSION="${{ github.event.inputs.kernelsu_version }}"
