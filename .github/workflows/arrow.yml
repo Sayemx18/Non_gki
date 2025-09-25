@@ -115,7 +115,7 @@ jobs:
       - name: Set Kernel Path and Name
         id: kernel-info
         run: |
-          KernelPath=$(ls Arrow_*.zip 2>/dev/null | head -n 1 || true)
+          KernelPath=$(ls ../Arrow_*.zip 2>/dev/null | head -n 1 || true)
           echo "KernelPath=$(pwd)/$KernelPath" >> $GITHUB_ENV
           echo "KernelName=$KernelPath" >> $GITHUB_ENV
           echo "kernel_name=$KernelPath" >> $GITHUB_OUTPUT
