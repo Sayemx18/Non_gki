@@ -57,6 +57,10 @@ jobs:
         device: ${{ fromJson(needs.prepare.outputs.devices) }}
 
     steps:
+      - name: Clone Kernel Source
+        run: |
+          git clone --depth=1 https://github.com/Sayemx18/arrow_kernel_alioth -b upstream kernel_tree
+
       - name: Install Dependencies
         run: |
           sudo apt-get update -y 
@@ -97,10 +101,6 @@ jobs:
           key: ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-ccache-${{ github.event.inputs.target_device }}-
-
-      - name: Clone Kernel Source
-        run: |
-          git clone --depth=1 https://github.com/Sayemx18/arrow_kernel_alioth -b upstream kernel_tree
 
       - name: Build Kernel
         run: |
