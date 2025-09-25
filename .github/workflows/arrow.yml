@@ -92,14 +92,7 @@ jobs:
           tar -xzf clang-r574158.tar.gz -C aosp-clang
           rm clang-r574158.tar.gz
           ls -la aosp-clang/bin/ | head -10
-
-      - name: Set toolchain path
-        run: |
-          TOOLCHAIN_PATH=$(pwd)/toolchain/aosp-clang/bin
-          echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> $GITHUB_ENV
-          echo "$TOOLCHAIN_PATH" >> $GITHUB_PATH
-          
-          
+      
       - name: Cache ccache
         uses: actions/cache@v4
         with:
@@ -110,17 +103,13 @@ jobs:
 
       - name: Build Kernel
         run: |
+          
           cd kernel_tree
-          
-          # Create the expected toolchain directory structure
-          mkdir -p toolchain
-          ln -sf ../../toolchain/aosp-clang toolchain/aosp-clang
-          
-          # Verify the toolchain is accessible
-          echo "Checking toolchain:"
-          ls -la toolchain/aosp-clang/bin/ | head -5
-          
+         
+          sed -i 's|TOOLCHAIN_PATH=\$HOME/toolchain/aosp-clang/bin|TOOLCHAIN_PATH=$(pwd)/toolchain/aosp-clang/bin|' bbuildd.sh
           DEVICE="${{ matrix.device }}"
+          KSU_VERSION="${{ github.event.inputs.kernelsu_version }}"
+          ADDITIONAL_FUNCTION="${{ github.event.inputs.additional_function }}"
           bash bbuildd.sh "$DEVICE"
           
       - name: Set Kernel Path and Name
