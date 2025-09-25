@@ -128,8 +128,11 @@ jobs:
       - name: Upload Kernel to Telegram (Individual)
         if: ${{ github.event.inputs.upload_to_telegram == 'yes' }}
         run: | 
+          ZIP_FILE=$(1s kernel_tree/Arrow_*.zip | head -1)
+          echo "Uploading: $ZIP_FILE"
+          
           curl -F chat_id=${{ secrets.TG_CHAT_ID }} \
-               -F document=@kernel_tree/Arrow_*.zip \
+               -F document=@$ZIP_FILE \
                -F caption="Arrow Revived Kernel for ${{ matrix.device }}" \
                "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
 
