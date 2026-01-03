@@ -7,6 +7,10 @@ on:
         description: 'Kernel source repository URL'
         required: true
         default: ''
+      kernel_branch:
+        description: 'Kernel source branch/tag/commit'
+        required: false
+        default: 'main'
       DEFCONFIG:
         description: 'Kernel defconfig (e.g., rve_defconfig)'
         required: true
