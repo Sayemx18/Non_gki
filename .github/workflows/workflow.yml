@@ -8,9 +8,9 @@ on:
         required: true
         default: ''
       DEFCONFIG:
-        description: 'Kernel defconfig (e.g., alioth_defconfig)'
+        description: 'Kernel defconfig (e.g., rve_defconfig)'
         required: true
-        default: 'alioth_defconfig'
+        default: 'rve_defconfig'
       CLANGDIR:
         description: 'Path to Clang (will be cloned if not set)'
         required: false
@@ -18,15 +18,16 @@ on:
       KBUILD_BUILD_USER:
         description: 'Build user'
         required: false
-        default: '${{ github.actor }}'
+        default: 'github-actions'
       KBUILD_BUILD_HOST:
         description: 'Build host'
         required: false
-        default: '${{ github.repository }}'
+        default: 'github-runner'
       CLEANBUILD:
         description: 'Clean build (true/false)'
         required: false
-        default: 'false'
+        type: boolean
+        default: false
   push:
     branches: [ main ]
 
@@ -37,9 +38,10 @@ jobs:
     - name: Clone kernel source
       uses: actions/checkout@v4
       with:
-        repository: ${{ github.event.inputs.kernel_source }}
+        repository: ${{ inputs.kernel_source }}
         path: kernel
         fetch-depth: 0
+      if: inputs.kernel_source != ''
 
     - name: Install dependencies
       run: |
@@ -48,9 +50,9 @@ jobs:
 
     - name: Setup Clang
       run: |
-        if [ "${{ github.event.inputs.CLANGDIR }}" != "" ]; then
-          echo "Custom CLANGDIR provided via inputs"
-          CLANGDIR="${{ github.event.inputs.CLANGDIR }}"
+        if [ "${{ inputs.CLANGDIR }}" != "" ]; then
+          echo "Custom CLANGDIR provided"
+          CLANGDIR="${{ inputs.CLANGDIR }}"
         else
           git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang
           CLANGDIR="$GITHUB_WORKSPACE/clang"
@@ -59,21 +61,20 @@ jobs:
         echo "$CLANGDIR/bin" >> $GITHUB_PATH
 
     - name: Clean build (if requested)
-      if: github.event.inputs.CLEANBUILD == 'true'
+      if: inputs.CLEANBUILD == true
       run: |
         cd kernel
-        rm -rf out
+        rm -rf out || true
 
     - name: Create out directory
       run: |
-        cd kernel
-        mkdir -p out
+        mkdir -p kernel/out
 
     - name: Build kernel
       env:
-        DEFCONFIG: ${{ github.event.inputs.DEFCONFIG }}
-        KBUILD_BUILD_USER: ${{ github.event.inputs.KBUILD_BUILD_USER }}
-        KBUILD_BUILD_HOST: ${{ github.event.inputs.KBUILD_BUILD_HOST }}
+        DEFCONFIG: ${{ inputs.DEFCONFIG }}
+        KBUILD_BUILD_USER: ${{ inputs.KBUILD_BUILD_USER || 'github-actions' }}
+        KBUILD_BUILD_HOST: ${{ inputs.KBUILD_BUILD_HOST || 'github-runner' }}
       working-directory: ./kernel
       run: |
         export PATH="$CLANGDIR/bin:$PATH"
@@ -81,8 +82,10 @@ jobs:
         echo "Using CLANGDIR: $CLANGDIR"
         echo "Using KBUILD_BUILD_USER: $KBUILD_BUILD_USER"
         echo "Using KBUILD_BUILD_HOST: $KBUILD_BUILD_HOST"
-        make O=out ARCH=arm64 $DEFCONFIG || make O=out ARCH=arm64 $DEFCONFIG
-        make -j$(nproc) --silent O=out \
+        
+        make O=out ARCH=arm64 "$DEFCONFIG" || make O=out ARCH=arm64 "$DEFCONFIG"
+        
+        make -j$(nproc) O=out \
           LLVM=1 \
           LLVM_IAS=1 \
           ARCH=arm64 \
