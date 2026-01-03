@@ -32,30 +32,42 @@ on:
         required: false
         type: boolean
         default: false
+
   push:
     branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Clone kernel source
+    - name: Clone kernel source (with submodules)
       uses: actions/checkout@v4
       with:
         repository: ${{ inputs.kernel_source }}
+        ref: ${{ inputs.kernel_branch }}
         path: kernel
         fetch-depth: 0
+        submodules: recursive
       if: inputs.kernel_source != ''
+
+    - name: Ensure submodules are initialized
+      working-directory: kernel
+      run: |
+        git submodule sync --recursive
+        git submodule update --init --recursive
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y bc bison flex libssl-dev git make
+        sudo apt-get install -y \
+          bc bison flex libssl-dev git make \
+          build-essential libncurses-dev
 
     - name: Setup Clang
       run: |
         if [ "${{ inputs.CLANGDIR }}" != "" ]; then
-          echo "Custom CLANGDIR provided"
+          echo "Using custom CLANGDIR"
           CLANGDIR="${{ inputs.CLANGDIR }}"
         else
           git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang
@@ -71,24 +83,24 @@ jobs:
         rm -rf out || true
 
     - name: Create out directory
-      run: |
-        mkdir -p kernel/out
+      run: mkdir -p kernel/out
 
     - name: Build kernel
+      working-directory: kernel
       env:
         DEFCONFIG: ${{ inputs.DEFCONFIG }}
-        KBUILD_BUILD_USER: ${{ inputs.KBUILD_BUILD_USER || 'github-actions' }}
-        KBUILD_BUILD_HOST: ${{ inputs.KBUILD_BUILD_HOST || 'github-runner' }}
-      working-directory: ./kernel
+        KBUILD_BUILD_USER: ${{ inputs.KBUILD_BUILD_USER }}
+        KBUILD_BUILD_HOST: ${{ inputs.KBUILD_BUILD_HOST }}
       run: |
         export PATH="$CLANGDIR/bin:$PATH"
-        echo "Using DEFCONFIG: $DEFCONFIG"
-        echo "Using CLANGDIR: $CLANGDIR"
-        echo "Using KBUILD_BUILD_USER: $KBUILD_BUILD_USER"
-        echo "Using KBUILD_BUILD_HOST: $KBUILD_BUILD_HOST"
-        
-        make O=out ARCH=arm64 "$DEFCONFIG" || make O=out ARCH=arm64 "$DEFCONFIG"
-        
+
+        echo "DEFCONFIG: $DEFCONFIG"
+        echo "CLANGDIR: $CLANGDIR"
+        echo "KBUILD_BUILD_USER: $KBUILD_BUILD_USER"
+        echo "KBUILD_BUILD_HOST: $KBUILD_BUILD_HOST"
+
+        make O=out ARCH=arm64 "$DEFCONFIG"
+
         make -j$(nproc) O=out \
           LLVM=1 \
           LLVM_IAS=1 \
@@ -106,15 +118,16 @@ jobs:
           HOSTCXX=clang++ \
           HOSTAR=llvm-ar \
           HOSTLD=ld.lld \
-          CROSS_COMPILE=aarch64-linux-gnu- 2>&1 | tee out/compile.log
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          2>&1 | tee out/compile.log
 
     - name: Upload kernel artifacts
       uses: actions/upload-artifact@v4
       with:
         name: kernel-build
         path: |
-          kernel/out/*.Image.*.dtb
-          kernel/out/*.Image.gz*
+          kernel/out/**/*.dtb
+          kernel/out/**/*Image*
           kernel/out/compile.log
 
     - name: Upload out directory (zipped)
