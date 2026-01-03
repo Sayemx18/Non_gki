@@ -1,0 +1,118 @@
+name: Kernel Compile Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_source:
+        description: 'Kernel source repository URL'
+        required: true
+        default: ''
+      DEFCONFIG:
+        description: 'Kernel defconfig (e.g., alioth_defconfig)'
+        required: true
+        default: 'alioth_defconfig'
+      CLANGDIR:
+        description: 'Path to Clang (will be cloned if not set)'
+        required: false
+        default: ''
+      KBUILD_BUILD_USER:
+        description: 'Build user'
+        required: false
+        default: '${{ github.actor }}'
+      KBUILD_BUILD_HOST:
+        description: 'Build host'
+        required: false
+        default: '${{ github.repository }}'
+      CLEANBUILD:
+        description: 'Clean build (true/false)'
+        required: false
+        default: 'false'
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone kernel source
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.inputs.kernel_source }}
+        path: kernel
+        fetch-depth: 0
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison flex libssl-dev git make
+
+    - name: Setup Clang
+      run: |
+        if [ "${{ github.event.inputs.CLANGDIR }}" != "" ]; then
+          echo "Custom CLANGDIR provided via inputs"
+          CLANGDIR="${{ github.event.inputs.CLANGDIR }}"
+        else
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang
+          CLANGDIR="$GITHUB_WORKSPACE/clang"
+        fi
+        echo "CLANGDIR=$CLANGDIR" >> $GITHUB_ENV
+        echo "$CLANGDIR/bin" >> $GITHUB_PATH
+
+    - name: Clean build (if requested)
+      if: github.event.inputs.CLEANBUILD == 'true'
+      run: |
+        cd kernel
+        rm -rf out
+
+    - name: Create out directory
+      run: |
+        cd kernel
+        mkdir -p out
+
+    - name: Build kernel
+      env:
+        DEFCONFIG: ${{ github.event.inputs.DEFCONFIG }}
+        KBUILD_BUILD_USER: ${{ github.event.inputs.KBUILD_BUILD_USER }}
+        KBUILD_BUILD_HOST: ${{ github.event.inputs.KBUILD_BUILD_HOST }}
+      working-directory: ./kernel
+      run: |
+        export PATH="$CLANGDIR/bin:$PATH"
+        echo "Using DEFCONFIG: $DEFCONFIG"
+        echo "Using CLANGDIR: $CLANGDIR"
+        echo "Using KBUILD_BUILD_USER: $KBUILD_BUILD_USER"
+        echo "Using KBUILD_BUILD_HOST: $KBUILD_BUILD_HOST"
+        make O=out ARCH=arm64 $DEFCONFIG || make O=out ARCH=arm64 $DEFCONFIG
+        make -j$(nproc) --silent O=out \
+          LLVM=1 \
+          LLVM_IAS=1 \
+          ARCH=arm64 \
+          CC=clang \
+          LD=ld.lld \
+          AR=llvm-ar \
+          AS=llvm-as \
+          NM=llvm-nm \
+          STRIP=llvm-strip \
+          OBJCOPY=llvm-objcopy \
+          OBJDUMP=llvm-objdump \
+          READELF=llvm-readelf \
+          HOSTCC=clang \
+          HOSTCXX=clang++ \
+          HOSTAR=llvm-ar \
+          HOSTLD=ld.lld \
+          CROSS_COMPILE=aarch64-linux-gnu- 2>&1 | tee out/compile.log
+
+    - name: Upload kernel artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-build
+        path: |
+          kernel/out/*.Image.*.dtb
+          kernel/out/*.Image.gz*
+          kernel/out/compile.log
+
+    - name: Upload out directory (zipped)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: out-directory
+        path: kernel/out/
