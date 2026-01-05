@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Clone Kernel Source
         run: |
-          git clone https://github.com/Sayemx18/arrow_kernel_alioth -b upstream kernel_tree
+          git clone https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b base kernel_tree
 
 
       - name: Download AOSP Clang
