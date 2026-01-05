@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-     - name: Clone Kernel Source
+      - name: Clone Kernel Source
         run: |
           git clone --depth=1 https://github.com/Sayemx18/arrow_kernel_alioth -b upstream kernel_tree
 
