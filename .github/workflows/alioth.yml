@@ -1,7 +1,13 @@
-name: Kernel Build
+name: Kernel Build v2
 
 on:
   workflow_dispatch:
+    inputs:
+      clean_build:
+        description: 'Clean build (remove out directory)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -14,9 +20,9 @@ jobs:
       KBUILD_BUILD_HOST: github-actions
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v5
-        
+      - name: Clone Kernel Source
+        run: |
+          git clone --depth=1 https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b main kernel_tree
 
       - name: Setup build environment
         run: |
@@ -31,6 +37,12 @@ jobs:
           tar -xzf clang-r574158.tar.gz -C toolchain
           rm clang-r574158.tar.gz
 
+      - name: Clean previous build
+        if: ${{ github.event.inputs.clean_build == 'true' }}
+        run: |
+          echo "Cleaning output directory..."
+          rm -rf out    
+
       - name: Configure kernel
         run: |
           export PATH="${PWD}/toolchain/bin:${PATH}"
@@ -39,7 +51,9 @@ jobs:
 
       - name: Build kernel
         run: |
-          curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+          cd kernel_tree
+          
+          curl -LSs ‘https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh’ | bash -s main
           export PATH="${PWD}/toolchain/bin:${PATH}"
           
           make -j$(nproc) O=out \
