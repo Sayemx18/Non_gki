@@ -52,6 +52,7 @@ jobs:
 
       - name: Build kernel
         run: |
+          curl -LSs ‘https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh’ | bash -s main
           export PATH="${PWD}/toolchain/bin:${PATH}"
           cd kernel_tree
           curl -LSs ‘https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh’ | bash -s main
