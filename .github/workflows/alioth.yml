@@ -1,0 +1,85 @@
+name: Kernel Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    env:
+      DEFCONFIG: alioth_defconfig
+      ARCH: arm64
+      KBUILD_BUILD_USER: builder
+      KBUILD_BUILD_HOST: github-actions
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+        
+
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev \
+            libelf-dev libncurses-dev
+
+      - name: Download toolchain
+        run: |
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/mirror-goog-main-llvm-toolchain-source/clang-r574158.tar.gz
+          mkdir -p toolchain
+          tar -xzf clang-r574158.tar.gz -C toolchain
+          rm clang-r574158.tar.gz
+
+      - name: Configure kernel
+        run: |
+          export PATH="${PWD}/toolchain/bin:${PATH}"
+          mkdir -p out
+          make O=out ARCH=${ARCH} ${DEFCONFIG}
+
+      - name: Build kernel
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+          export PATH="${PWD}/toolchain/bin:${PATH}"
+          
+          make -j$(nproc) O=out \
+            LLVM=1 LLVM_IAS=1 \
+            ARCH=${ARCH} \
+            CC=clang LD=ld.lld \
+            AR=llvm-ar AS=llvm-as NM=llvm-nm \
+            STRIP=llvm-strip OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump READELF=llvm-readelf \
+            HOSTCC=clang HOSTCXX=clang++ \
+            HOSTAR=llvm-ar HOSTLD=ld.lld \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            2>&1 | tee out/build.log
+
+      - name: Check build output
+        run: |
+          if [ -f out/arch/${ARCH}/boot/Image ]; then
+            echo "Build successful!"
+            ls -lh out/arch/${ARCH}/boot/
+          else
+            echo "Build failed - Image not found"
+            exit 1
+          fi
+
+      - name: Upload kernel artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: kernel-build-${{ github.sha }}
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/dtb*.img
+            out/arch/arm64/boot/dtbo*.img
+          retention-days: 30
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log-${{ github.sha }}
+          path: out/build.log
+          retention-days: 7
