@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b base kernel_tree
+          git clone https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b base kernel_tree
 
       - name: Setup build environment
         run: |
@@ -72,11 +72,11 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main anyKernel
 
-          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+          find kernel_tree/out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
 
-          cp out/arch/arm64/boot/Image anyKernel/
-          cp out/arch/arm64/boot/dtb anyKernel/
-          cp out/arch/arm64/boot/dtbo.img anykernel/
+          cp kernel_tree/out/arch/arm64/boot/Image anyKernel/
+          cp kernel_tree/out/arch/arm64/boot/dtb anyKernel/
+          cp kernel_tree/out/arch/arm64/boot/dtbo.img anyKernel/
           cd anyKernel
           zip -r9 ../Redline_Kernel-Alioth_Ksu.zip * -x .git README.md *placeholder
 
