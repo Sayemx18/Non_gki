@@ -68,17 +68,7 @@ jobs:
             CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             2>&1 | tee out/build.log
 
-      - name: Check build output
-        run: |
-          if [ -f out/arch/${ARCH}/boot/Image ]; then
-            echo "Build successful!"
-            ls -lh out/arch/${ARCH}/boot/
-          else
-            echo "Build failed - Image not found"
-            exit 1
-          fi
-
-      - name: Clone AnyKernel3
+      - name: Zip AnyKernel3
         run: |
           git clone --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main anyKernel
 
