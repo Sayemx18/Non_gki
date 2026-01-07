@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Clone Kernel Source
         run: |
-          git clone --depth=1 https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b main kernel_tree
+          git clone --depth=1 https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b base kernel_tree
 
       - name: Setup build environment
         run: |
@@ -52,10 +52,8 @@ jobs:
 
       - name: Build kernel
         run: |
-          curl -LSs ‘https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh’ | bash -s main
           export PATH="${PWD}/toolchain/bin:${PATH}"
           cd kernel_tree
-          curl -LSs ‘https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh’ | bash -s main
           
           make -j$(nproc) O=out \
             LLVM=1 LLVM_IAS=1 \
@@ -80,16 +78,24 @@ jobs:
             exit 1
           fi
 
-      - name: Upload kernel artifacts
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: kernel-build-${{ github.sha }}
-          path: |
-            out/arch/arm64/boot/Image
-            out/arch/arm64/boot/dtb*.img
-            out/arch/arm64/boot/dtbo*.img
-          retention-days: 30
+      - name: Clone AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main anyKernel
+
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+
+          cp out/arch/arm64/boot/Image anyKernel/
+          cp out/arch/arm64/boot/dtb anyKernel/
+          cp out/arch/arm64/boot/dtbo.img anykernel/
+          cd anyKernel
+          zip -r9 ../Redline_Kernel-Alioth_Ksu.zip * -x .git README.md *placeholder
+
+      - name: Upload to Telegram
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument" \
+            -F chat_id="${{ secrets.TG_CHAT_ID }}" \
+            -F document=@Redline_Kernel-Alioth_Ksu.zip \
+            -F caption="Kernel build completed"
 
       - name: Upload build log
         uses: actions/upload-artifact@v4
