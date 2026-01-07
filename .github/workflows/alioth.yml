@@ -72,12 +72,14 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main anyKernel
 
-          find kernel_tree/out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+          cd kernel_tree
+          
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
 
-          cp kernel_tree/out/arch/arm64/boot/Image anyKernel/
-          cp kernel_tree/out/arch/arm64/boot/dtb anyKernel/
-          cp kernel_tree/out/arch/arm64/boot/dtbo.img anyKernel/
-          cd anyKernel
+          cp out/arch/arm64/boot/Image ../anyKernel/
+          cp out/arch/arm64/boot/dtb ../anyKernel/
+          cp out/arch/arm64/boot/dtbo.img ../anyKernel/
+          cd ../anyKernel
           zip -r9 ../Redline_Kernel-Alioth_Ksu.zip * -x .git README.md *placeholder
 
       - name: Upload to Telegram
