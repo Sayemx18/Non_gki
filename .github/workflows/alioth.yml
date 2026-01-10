@@ -40,6 +40,7 @@ jobs:
       - name: Clean previous build
         if: ${{ github.event.inputs.clean_build == 'true' }}
         run: |
+          cd kernel_tree
           echo "Cleaning output directory..."
           rm -rf out    
 
@@ -94,5 +95,5 @@ jobs:
         if: always()
         with:
           name: build-log-${{ github.sha }}
-          path: out/build.log
+          path: kernel_tree/out/build.log
           retention-days: 7
