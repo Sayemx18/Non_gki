@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Clone Kernel Source
         run: |
-          git clone https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b 5kmah kernel_tree
+          git clone https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b 5kmah kernel
 
       - name: Setup build environment
         run: |
@@ -40,7 +40,7 @@ jobs:
       - name: Clean previous build
         if: ${{ github.event.inputs.clean_build == 'true' }}
         run: |
-          cd kernel_tree
+          cd kernel
           echo "Cleaning output directory..."
           rm -rf out    
 
@@ -48,13 +48,13 @@ jobs:
         run: |
           export PATH="${PWD}/toolchain/bin:${PATH}"
           mkdir -p out
-          cd kernel_tree
+          cd kernel
           make O=out ARCH=${ARCH} ${DEFCONFIG}
 
       - name: Build kernel
         run: |
           export PATH="${PWD}/toolchain/bin:${PATH}"
-          cd kernel_tree
+          cd kernel
           
           make -j$(nproc) O=out \
             LLVM=1 LLVM_IAS=1 \
@@ -73,7 +73,7 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main anyKernel
 
-          cd kernel_tree
+          cd kernel
           
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
 
@@ -95,5 +95,5 @@ jobs:
         if: always()
         with:
           name: build-log-${{ github.sha }}
-          path: kernel_tree/out/build.log
+          path: kernel/out/build.log
           retention-days: 7
