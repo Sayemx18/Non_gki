@@ -1,0 +1,99 @@
+name: Alioth 5k
+
+on:
+  workflow_dispatch:
+    inputs:
+      clean_build:
+        description: 'Clean build (remove out directory)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    env:
+      DEFCONFIG: alioth_defconfig
+      ARCH: arm64
+      KBUILD_BUILD_USER: sayem
+      KBUILD_BUILD_HOST: sayemx18
+
+    steps:
+      - name: Clone Kernel Source
+        run: |
+          git clone https://github.com/Sayemx18/kernel_xiaomi_sm8250 -b 5kmah kernel_tree
+
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev \
+            libelf-dev libncurses-dev
+
+      - name: Download toolchain
+        run: |
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/mirror-goog-main-llvm-toolchain-source/clang-r574158.tar.gz
+          mkdir -p toolchain
+          tar -xzf clang-r574158.tar.gz -C toolchain
+          rm clang-r574158.tar.gz
+
+      - name: Clean previous build
+        if: ${{ github.event.inputs.clean_build == 'true' }}
+        run: |
+          cd kernel_tree
+          echo "Cleaning output directory..."
+          rm -rf out    
+
+      - name: Configure kernel
+        run: |
+          export PATH="${PWD}/toolchain/bin:${PATH}"
+          mkdir -p out
+          cd kernel_tree
+          make O=out ARCH=${ARCH} ${DEFCONFIG}
+
+      - name: Build kernel
+        run: |
+          export PATH="${PWD}/toolchain/bin:${PATH}"
+          cd kernel_tree
+          
+          make -j$(nproc) O=out \
+            LLVM=1 LLVM_IAS=1 \
+            ARCH=${ARCH} \
+            CC=clang LD=ld.lld \
+            AR=llvm-ar AS=llvm-as NM=llvm-nm \
+            STRIP=llvm-strip OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump READELF=llvm-readelf \
+            HOSTCC=clang HOSTCXX=clang++ \
+            HOSTAR=llvm-ar HOSTLD=ld.lld \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            2>&1 | tee out/build.log
+
+      - name: Zip AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/Sayemx18/AnyKernel3 -b main anyKernel
+
+          cd kernel_tree
+          
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+
+          cp out/arch/arm64/boot/Image ../anyKernel/
+          cp out/arch/arm64/boot/dtb ../anyKernel/
+          cp out/arch/arm64/boot/dtbo.img ../anyKernel/
+          cd ../anyKernel
+          zip -r9 ../Redline_Kernel-Alioth-5k_Ksu.zip * -x .git README.md *placeholder
+
+      - name: Upload to Telegram
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument" \
+            -F chat_id="${{ secrets.TG_CHAT_ID }}" \
+            -F document=@Redline_Kernel-Alioth-5k_Ksu.zip \
+            -F caption="Kernel build completed"
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log-${{ github.sha }}
+          path: kernel_tree/out/build.log
+          retention-days: 7
