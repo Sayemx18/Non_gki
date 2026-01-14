@@ -51,7 +51,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} RedlineFork
+          git clone ${{ github.event.inputs.KERNEL_TREE }} RedlineFork
 
       - name: Lets cherry-pick
         run : | 
