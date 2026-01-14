@@ -62,6 +62,7 @@ jobs:
           git fetch mymods
           git cherry-pick 88667341c364a7ba711085491fe57e2a803af76a^..23728680189d42a5ffbbfddd2670d20c9fae588a
           git cherry-pick 8ece70fba1d93fe623c6df4309afda4dd113d55f^..a852125b89f871fdf6a82fba34b8f2733eff0f79
+          git fetch origin
           git revert 1cdb6ca2c3ef5de1d2e3b0955dea40add27c2749
           git revert bc1c8973e55c9aee9446fd493bffeb47a1e848f6
 
