@@ -54,7 +54,9 @@ jobs:
           git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} RedlineFork
 
       - name: Lets cherry-pick
-        run : |
+        run : | 
+          git config --global user.email "sayemxx18@gmail.com"
+          git config --global user.name "sayem"
           cd RedlineFork
           git remote add mymods https://github.com/Sayemx18/kernel_xiaomi_sm8250.git
           git fetch mymods
