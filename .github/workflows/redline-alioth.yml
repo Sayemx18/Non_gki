@@ -21,12 +21,7 @@ on:
           - aosp
           - aosp-21
         default: aosp
-      clean_build:
-        description: 'Clean build (remove out directory)'
-        required: false
-        type: boolean
-        default: false
-
+      
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -52,14 +47,7 @@ jobs:
             mkdir clang
             unzstd -d clang.tar.zst
             tar -xf clang.tar -C clang
-          fi
-
-      - name: Clean previous build
-        if: ${{ github.event.inputs.clean_build == 'true' }}
-        run: |
-          cd Redline
-          echo "Cleaning output directory..."
-          rm -rf out
+          fi      
 
       - name: Clone Repo
         run: |
