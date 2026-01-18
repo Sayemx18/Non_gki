@@ -21,6 +21,11 @@ on:
           - aosp
           - aosp-21
         default: aosp
+      clean_build:
+        description: 'Clean build (remove out directory)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -48,6 +53,13 @@ jobs:
             unzstd -d clang.tar.zst
             tar -xf clang.tar -C clang
           fi
+
+      - name: Clean previous build
+        if: ${{ github.event.inputs.clean_build == 'true' }}
+        run: |
+          cd Redline
+          echo "Cleaning output directory..."
+          rm -rf out
 
       - name: Clone Repo
         run: |
@@ -133,6 +145,8 @@ jobs:
         run: |
           CAPTION="Redline Fork Kernel For alioth
           Battery Variant: Stock
+          Full Lto
+          Changelog:sync with lineage qcom sm8250
           Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
 
           curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
