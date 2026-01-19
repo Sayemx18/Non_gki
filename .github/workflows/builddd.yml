@@ -33,6 +33,22 @@ jobs:
       UPLOAD_TO_RELEASE: false
 
     steps:
+     - name: Maximize Build Space
+       run: |
+         sudo rm -rf /usr/share/dotnet
+         sudo rm -rf /opt/ghc
+         sudo rm -rf "/usr/local/share/boost"
+         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+         df -h
+
+      - name: Setup Swap Space
+        run: |
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+         
       - name: Install Dependencies
         run: sudo apt install flex libncurses6
 
