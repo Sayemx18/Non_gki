@@ -1,0 +1,168 @@
+name: getting back
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      KERNEL_TREE:
+        description: 'Kernel Tree'
+        default: 'https://github.com/Sayemx18/kernel_xiaomi_sm8250.git'
+        required: true
+      ANYKERNEL_URL:
+        description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
+        default: 'https://github.com/Sayemx18/AnyKernel3.git'
+        required: false
+      COMPILER:
+        description: 'Choose compiler'
+        required: true
+        type: choice
+        options:
+          - neutron
+          - aosp
+          - aosp-21
+        default: aosp
+      
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      UPLOAD_TO_RELEASE: false
+
+    steps:
+      - name: Install Dependencies
+        run: sudo apt install flex libncurses6
+
+      - name: Download & Extract Clang
+        run: |
+          if [[ "${{ github.event.inputs.COMPILER }}" == "aosp" ]]; then
+            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
+            mkdir clang
+            tar -xf clang.tar.gz -C clang
+          elif [[ "${{ github.event.inputs.COMPILER }}" == "aosp-21" ]]; then
+            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/ebcc6c3bef363bc539ea39f45b6abae1dce6ff1a/clang-r574158.tar.gz -O clang.tar.gz
+            mkdir clang
+            tar -xf clang.tar.gz -C clang
+          else
+            wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
+            mkdir clang
+            unzstd -d clang.tar.zst
+            tar -xf clang.tar -C clang
+          fi      
+
+      - name: Clone Repo
+        run: |
+          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base Redline
+
+      - name: Build Kernel
+        run: |
+          export PATH="$(pwd)/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=ARM64
+          export KBUILD_BUILD_USER="sayem"
+          export KBUILD_BUILD_HOST="Sayemx18"
+          export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
+          cd Redline
+          make O=out clean mrproper
+          make O=out alioth_defconfig
+          scripts/config --file out/.config \
+            -e LTO=y \
+            -e THINLTO \
+            -e LTO_CLANG
+          make -j$(nproc) O=out \
+            LLVM=1 LLVM_IAS=1 \
+            ARCH=${ARCH} \
+            CC=clang LD=ld.lld \
+            AR=llvm-ar AS=llvm-as NM=llvm-nm \
+            STRIP=llvm-strip OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump READELF=llvm-readelf \
+            HOSTCC=clang HOSTCXX=clang++ \
+            HOSTAR=llvm-ar HOSTLD=ld.lld \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            2>&1 | tee out/build.log
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+          echo "all files:"
+          ls -lhaR out/arch/arm64/boot/
+
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Image
+          path: ./Redline/out/arch/arm64/boot/Image
+          if-no-files-found: ignore
+          retention-days: 7
+
+     #  - name: Upload Image.gz
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: Image
+      #     path: ./kernel_tree/out/arch/arm64/boot/Image.gz
+      #     if-no-files-found: ignore
+      #     retention-days: 7
+
+      - name: Upload dtb
+        uses: actions/upload-artifact@v4
+        with:
+          name: dtb
+          path: ./Redline/out/arch/arm64/boot/dtb
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload dtbo.img
+        uses: actions/upload-artifact@v4
+        with:
+          name: dtbo.img
+          path: ./Redline/out/arch/arm64/boot/dtbo.img
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build.log
+          path: ./Redline/out/arch/arm64/boot/build.log
+          if-no-files-found: ignore
+          retention-days: 7
+          
+          
+      - name: Clone AnyKernel3
+        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main anykernel
+
+      - name: Move Kernel Files to AnyKernel3
+        run: |
+          mv ./Redline/out/arch/arm64/boot/Image anykernel/
+          mv ./Redline/out/arch/arm64/boot/dtb anykernel/
+          mv ./Redline/out/arch/arm64/boot/dtbo.img anykernel/
+
+      - name: Define ZIP Name
+        run: |
+          COMPILED_DATE=$(date +%Y%m%d)
+          echo "ZIP_NAME=RedlineFork(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
+          
+      - name: Create Flashable Kernel Zip
+        run: |
+          cd anykernel
+          zip -r "../${ZIP_NAME}.zip" . -x ".git/*" ".github/*"
+          
+      - name: Upload Flashable Kernel Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_NAME }}.zip
+          retention-days: 30
+          
+      - name: Upload Kernel Zip to Telegram
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          CAPTION="Redline Fork Kernel For alioth
+          Battery Variant: Stock
+          Changelog:sync with lineage qcom sm8250
+          Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
+
+          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TG_CHAT_ID}" \
+            -F document=@"${ZIP_NAME}.zip" \
+            -F caption="$CAPTION"
+      
