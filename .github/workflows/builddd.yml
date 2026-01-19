@@ -62,7 +62,6 @@ jobs:
           export KBUILD_BUILD_HOST="Sayemx18"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           cd Redlines
-          make O=out clean mrproper
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e LTO \
@@ -70,17 +69,18 @@ jobs:
             -e LTO_CLANG \
             -e KSU \
             -e KSU_MANUAL_HOOK
-          make -j$(nproc) O=out \
-            LLVM=1 LLVM_IAS=1 \
-            ARCH=${ARCH} \
-            CC=clang LD=ld.lld \
-            AR=llvm-ar AS=llvm-as NM=llvm-nm \
-            STRIP=llvm-strip OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump READELF=llvm-readelf \
-            HOSTCC=clang HOSTCXX=clang++ \
-            HOSTAR=llvm-ar HOSTLD=ld.lld \
+          make O=out \
+            ARCH=arm64 \
+            SUBARCH=arm64 \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CC=clang \
+            HOSTCC=gcc \
+            HOSTCFLAGS="-O2 -Wall" \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            -j$(nproc --all) \
             2>&1 | tee out/build.log
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
           echo "all files:"
