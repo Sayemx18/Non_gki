@@ -65,7 +65,7 @@ jobs:
           make O=out clean mrproper
           make O=out alioth_defconfig
           scripts/config --file out/.config \
-            -e LTO=y \
+            -e LTO \
             -e THINLTO \
             -e LTO_CLANG \
             -e KSU \
