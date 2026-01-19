@@ -1,4 +1,4 @@
-name: getting back
+name: KBuild Redline
 
 on:
   pull_request:
@@ -75,13 +75,12 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1 \
             CC=clang \
-            HOSTCC=gcc \
-            HOSTCFLAGS="-O2 -Wall" \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             CLANG_TRIPLE=aarch64-linux-gnu- \
-            -j$(nproc --all) \
-            2>&1 | tee out/build.log
+            -j$(nproc --all)            
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
           echo "all files:"
           ls -lhaR out/arch/arm64/boot/
@@ -139,7 +138,7 @@ jobs:
       - name: Define ZIP Name
         run: |
           COMPILED_DATE=$(date +%Y%m%d)
-          echo "ZIP_NAME=RedlineFork-aluoth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
+          echo "ZIP_NAME=RedlineFork-alioth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
           
       - name: Create Flashable Kernel Zip
         run: |
@@ -160,6 +159,7 @@ jobs:
         run: |
           CAPTION="Redline Fork Kernel For alioth
           Battery Variant: Stock
+          Thin Lto
           Changelog:sync with lineage qcom sm8250
           Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
 
