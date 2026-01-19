@@ -63,7 +63,8 @@ jobs:
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           cd Redline
           rm -rf out
-          make O=out alioth_defconfig olddefconfig
+          make O=out alioth_defconfig
+          make O=out olddefconfig
           make O=out CC=clang -j$(nproc --all) CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
           echo "all files:"
