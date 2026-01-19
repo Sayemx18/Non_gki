@@ -33,14 +33,14 @@ jobs:
       UPLOAD_TO_RELEASE: false
 
     steps:
-     - name: Maximize Build Space
-       run: |
-         sudo rm -rf /usr/share/dotnet
-         sudo rm -rf /opt/ghc
-         sudo rm -rf "/usr/local/share/boost"
-         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-         df -h
-
+      - name: Maximize Build Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+    
       - name: Setup Swap Space
         run: |
           sudo fallocate -l 12G /swapfile
