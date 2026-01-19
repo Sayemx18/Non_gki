@@ -32,7 +32,24 @@ jobs:
       - name: Install Dependencies
         run: sudo apt install flex libncurses6
 
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: kernel-build-${{ github.event.inputs.COMPILER }}-${{ github.sha }}
+          restore-keys: |
+            kernel-build-${{ github.event.inputs.COMPILER }}-
+            kernel-build-
+          max-size: 3G
+
+      - name: Cache Clang Toolchain
+        id: cache-clang
+        uses: actions/cache@v4
+        with:
+          path: clang
+          key: clang-${{ github.event.inputs.COMPILER }}-v1
+
       - name: Download & Extract Clang
+        if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           if [[ "${{ github.event.inputs.COMPILER }}" == "aosp" ]]; then
             wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
@@ -61,6 +78,8 @@ jobs:
           export KBUILD_BUILD_USER="sayem"
           export KBUILD_BUILD_HOST="Sayemx18"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
+          export USE_CCACHE=1
+          export CCACHE_EXEC=/usr/bin/ccache
           cd Redlines
           make O=out alioth_defconfig
           scripts/config --file out/.config \
@@ -69,63 +88,36 @@ jobs:
             -e LTO_CLANG \
             -e KSU \
             -e KSU_MANUAL_HOOK
+
+          make O=out olddefconfig
+          
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
             LLVM=1 \
             LLVM_IAS=1 \
-            CC=clang \
+            CC="ccache clang" \
             HOSTCC=clang \
             HOSTCXX=clang++ \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             CLANG_TRIPLE=aarch64-linux-gnu- \
-            -j$(nproc --all)            
+            -j$(nproc --all) \
+            2>&1 | tee out/build.log
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
-          echo "all files:"
-          ls -lhaR out/arch/arm64/boot/
 
-      - name: Upload Image
+      - name: Upload Images
         uses: actions/upload-artifact@v4
         with:
-          name: Image
-          path: ./Redlines/out/arch/arm64/boot/Image
+          name: kernel-artifacts
+          path: |
+            ./Redlines/out/arch/arm64/boot/Image
+            ./Redlines/out/arch/arm64/boot/dtb
+            ./Redlines/out/arch/arm64/boot/dtbo.img
+            ./Redlines/out/build.log
           if-no-files-found: ignore
           retention-days: 7
-
-     #  - name: Upload Image.gz
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Image
-      #     path: ./kernel_tree/out/arch/arm64/boot/Image.gz
-      #     if-no-files-found: ignore
-      #     retention-days: 7
-
-      - name: Upload dtb
-        uses: actions/upload-artifact@v4
-        with:
-          name: dtb
-          path: ./Redlines/out/arch/arm64/boot/dtb
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Upload dtbo.img
-        uses: actions/upload-artifact@v4
-        with:
-          name: dtbo.img
-          path: ./Redlines/out/arch/arm64/boot/dtbo.img
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        with:
-          name: build.log
-          path: ./Redlines/out/arch/arm64/boot/build.log
-          if-no-files-found: ignore
-          retention-days: 7
-          
-          
+           
       - name: Clone AnyKernel3
         run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main anykernel
 
