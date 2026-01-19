@@ -51,7 +51,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base Redline
+          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base Redlines
 
       - name: Build Kernel
         run: |
@@ -61,13 +61,15 @@ jobs:
           export KBUILD_BUILD_USER="sayem"
           export KBUILD_BUILD_HOST="Sayemx18"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
-          cd Redline
+          cd Redlines
           make O=out clean mrproper
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e LTO=y \
             -e THINLTO \
-            -e LTO_CLANG
+            -e LTO_CLANG \
+            -e KSU \
+            -e KSU_MANUAL_HOOK
           make -j$(nproc) O=out \
             LLVM=1 LLVM_IAS=1 \
             ARCH=${ARCH} \
@@ -88,7 +90,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Image
-          path: ./Redline/out/arch/arm64/boot/Image
+          path: ./Redlines/out/arch/arm64/boot/Image
           if-no-files-found: ignore
           retention-days: 7
 
@@ -104,7 +106,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dtb
-          path: ./Redline/out/arch/arm64/boot/dtb
+          path: ./Redlines/out/arch/arm64/boot/dtb
           if-no-files-found: ignore
           retention-days: 7
 
@@ -112,7 +114,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dtbo.img
-          path: ./Redline/out/arch/arm64/boot/dtbo.img
+          path: ./Redlines/out/arch/arm64/boot/dtbo.img
           if-no-files-found: ignore
           retention-days: 7
 
@@ -120,7 +122,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build.log
-          path: ./Redline/out/arch/arm64/boot/build.log
+          path: ./Redlines/out/arch/arm64/boot/build.log
           if-no-files-found: ignore
           retention-days: 7
           
@@ -130,14 +132,14 @@ jobs:
 
       - name: Move Kernel Files to AnyKernel3
         run: |
-          mv ./Redline/out/arch/arm64/boot/Image anykernel/
-          mv ./Redline/out/arch/arm64/boot/dtb anykernel/
-          mv ./Redline/out/arch/arm64/boot/dtbo.img anykernel/
+          mv ./Redlines/out/arch/arm64/boot/Image anykernel/
+          mv ./Redlines/out/arch/arm64/boot/dtb anykernel/
+          mv ./Redlines/out/arch/arm64/boot/dtbo.img anykernel/
 
       - name: Define ZIP Name
         run: |
           COMPILED_DATE=$(date +%Y%m%d)
-          echo "ZIP_NAME=RedlineFork(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
+          echo "ZIP_NAME=RedlineFork-aluoth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
           
       - name: Create Flashable Kernel Zip
         run: |
