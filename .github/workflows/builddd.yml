@@ -88,9 +88,7 @@ jobs:
             -e LTO_CLANG \
             -e KSU \
             -e KSU_MANUAL_HOOK
-
-          make O=out olddefconfig
-          
+            
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
