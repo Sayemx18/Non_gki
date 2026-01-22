@@ -51,7 +51,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b base Redline
+          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b uvite Redline
 
       - name: Build Kernel
         run: |
