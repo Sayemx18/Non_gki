@@ -76,7 +76,7 @@ jobs:
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           cd RedlineFork
           git submodule update --init --recursive
-          make O=out alioth_defconfig
+          make O=out vendor/alioth_defconfig
           make O=out CC=clang -j$(nproc --all) CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
           echo "all files:"
