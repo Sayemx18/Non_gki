@@ -29,6 +29,14 @@ jobs:
       UPLOAD_TO_RELEASE: false
 
     steps:
+      - name: Cleanup
+        uses: rokibhasansagar/slimhub_actions@main
+      
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
+     
       - name: Install Dependencies
         run: sudo apt install flex libncurses6
 
@@ -63,7 +71,7 @@ jobs:
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           cd Redline
           rm -rf out
-          make O=out vendor/alioth_defconfig
+          make O=out vendor/munch_defconfig
           make O=out CC=clang -j$(nproc --all) CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
           echo "all files:"
@@ -127,18 +135,19 @@ jobs:
           path: ${{ env.ZIP_NAME }}.zip
           retention-days: 30
           
-      - name: Upload Kernel Zip to Telegram
-        env:
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: |
-          CAPTION="Redline Fork Kernel For alioth
-          Battery Variant: Stock
-          Changelog:sync with lineage qcom sm8250
-          Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
+#      - name: Upload Kernel Zip to Telegram
+#        env:
+    #      TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+   #       TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+#        run: |
+      #  CAPTION="Redline Fork Kernel For alioth
+ 
+          #Battery Variant: Stock
+     #     Changelog:sync with lineage qcom sm8250
+   #       Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
 
-          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
-            -F chat_id="${TG_CHAT_ID}" \
-            -F document=@"${ZIP_NAME}.zip" \
-            -F caption="$CAPTION"
+   #       curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
+   #         -F chat_id="${TG_CHAT_ID}" \
+        #    -F document=@"${ZIP_NAME}.zip" \
+     #      -F caption="$CAPTION"
       
