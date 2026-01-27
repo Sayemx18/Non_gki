@@ -72,7 +72,7 @@ jobs:
       - name: Revert Commits for 5kmah Variant
         run: |
           cd kernel_base        
-           if [[ "${{ matrix.battery }}" == "5kmah" ]]; then
+           if [[ "${{ matrix.battery }}" == "stock" ]]; then
             git config --global user.email "sayemxx18@gmail.com"
             git config --global user.name "sayem"
             git remote add myrepo https://github.com/Sayemx18/kernel_xiaomi_sm8250.git
@@ -107,17 +107,22 @@ jobs:
             -j$(nproc --all) \
             2>&1 | tee out/build.log
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
+          if [[ "${{ matrix.kernel }}" == "stock" ]]; then
+            cp out/arch/arm64/boot/Image ../Image
+            mv out/arch/arm64/boot/dtbo.img ../stock-dtbo.img
+            mv out/arch/arm64/boot/ ../dtb
+          else
+             mv out/arch/arm64/boot/dtbo.img ../5kmah-dtbo.img
 
-      - name: Rename Dtbo/Dtb
-        run: |
-         cp kernel_base/out/arch/arm64/boot/Image ../Image
-         if [[ "${{ matrix.battery }}" == "stock" ]]; then
-            cp kernel_base/out/arch/arm64/boot/dtbo.img ../dtbo-stock.img
-            cp kernel_base/out/arch/arm64/boot/dtb ../dtb-stock
-         else
-            cp kernel_base/out/arch/arm64/boot/dtbo.img ../j3s-dtbo.img
-            cp kernel_base/out/arch/arm64/boot/dtb ../dtb-5kmah
-          fi
+      - name: Upload Kernel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ matrix.kernel }}
+          path: |
+            *.img
+            dtb
+            Image
+            
           
   package_anykernel:
     needs: build
@@ -135,11 +140,10 @@ jobs:
       - name: Move Kernel Files to AnyKernel3
         run: |
           mv ../Image anykernel/
-          mv ../dtbo-stock.img anykernel/
-          mv ../dtb-stock anykernel/
-          mv ../j3s-dtbo.img anykernel/
-          mv ../dtb-5kmah anykernel/
-
+          mv ../stock-dtbo.img anykernel/
+          mv ../dtb anykernel/
+          mv ../5kmah-dtbo.img anykernel/
+          
       - name: Create Flashable Zip
         run: |
           cd anykernel
