@@ -72,7 +72,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 --branch ${{ github.event.inputs.BRANCH }} ${{ github.event.inputs.KERNEL_TREE }} Redlines
+          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.BRANCH }} Redlines
       - name: Clean
         run: |
           cd Redlines
@@ -89,7 +89,6 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd Redlines
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e LTO \
