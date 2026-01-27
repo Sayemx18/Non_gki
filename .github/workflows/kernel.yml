@@ -113,6 +113,7 @@ jobs:
             mv out/arch/arm64/boot/ ../dtb
           else
              mv out/arch/arm64/boot/dtbo.img ../5kmah-dtbo.img
+          fi
 
       - name: Upload Kernel Artifacts
         uses: actions/upload-artifact@v4
