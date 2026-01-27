@@ -1,0 +1,143 @@
+name: (Base Branch, 2 Variants)
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      KERNEL_TREE:
+        description: 'Kernel Tree'
+        default: 'https://github.com/Sayemx18/kernel_xiaomi_sm8250.git'
+        required: true
+      ANYKERNEL_URL:
+        description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
+        default: 'https://github.com/Sayemx18/AnyKernel3.git'
+        required: false
+      COMPILER:
+        description: 'Choose compiler'
+        required: true
+        type: choice
+        options:
+          - neutron
+          - aosp
+          - aosp-21
+        default: aosp
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        battery_variant: [stock, 5kmah]  
+
+    env:
+      UPLOAD_TO_RELEASE: false
+
+    steps:
+      - name: Install Dependencies
+        run: sudo apt install flex libncurses6
+
+      - name: Setup ccache  
+        uses: hendrikmuhs/ccache-action@v1.2  
+        with:  
+          key: kernel-build-${{ matrix.battery_variant }}-${{ github.event.inputs.COMPILER }}-${{ github.sha }}  
+          restore-keys: |  
+            kernel-build-${{ matrix.battery_variant }}-${{ github.event.inputs.COMPILER }}-  
+            kernel-build-${{ matrix.battery_variant }}-  
+            kernel-build-  
+          max-size: 3G  
+
+      - name: Cache Clang Toolchain
+        id: cache-clang
+        uses: actions/cache@v4
+        with:
+          path: clang
+          key: clang-${{ github.event.inputs.COMPILER }}-v1
+
+      - name: Download & Extract Clang
+        if: steps.cache-clang.outputs.cache-hit != 'true'
+        run: |
+          if [[ "${{ github.event.inputs.COMPILER }}" == "aosp" ]]; then
+            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
+            mkdir clang
+            tar -xf clang.tar.gz -C clang
+          elif [[ "${{ github.event.inputs.COMPILER }}" == "aosp-21" ]]; then
+            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/ebcc6c3bef363bc539ea39f45b6abae1dce6ff1a/clang-r574158.tar.gz -O clang.tar.gz
+            mkdir clang
+            tar -xf clang.tar.gz -C clang
+          else
+            wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
+            mkdir clang
+            unzstd -d clang.tar.zst
+            tar -xf clang.tar -C clang
+          fi
+
+      - name: Clone Kernel Tree
+        run: |
+          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base kernel_base
+
+      - name: Revert Commits for 5kmah Variant
+        if: matrix.battery_variant == '5kmah'
+        run: |
+          cd kernel_base
+          git revert --no-commit 1cdb6ca2c3ef5de1d2e3b0955dea40add27c2749
+          git revert --no-commit bc1c8973e55c9aee9446fd493bffeb47a1e848f6
+          git commit -m "Reverted two commits for 5kmah battery variant"
+
+      - name: Build Kernel
+        run: |
+          export PATH="$(pwd)/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=ARM64
+          export KBUILD_BUILD_USER="sayem"
+          export KBUILD_BUILD_HOST="Sayemx18"
+          export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
+          export USE_CCACHE=1
+          export CCACHE_EXEC=/usr/bin/ccache
+          cd kernel_base
+          make O=out alioth_defconfig
+          scripts/config --file out/.config \
+            -e LTO \
+            -e THINLTO \
+            -e LTO_CLANG \
+            -e KSU \
+            -e KSU_MANUAL_HOOK
+          make O=out \
+            ARCH=arm64 \
+            SUBARCH=arm64 \
+            LLVM=1 LLVM_IAS=1 \
+            CC="ccache clang" \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            -j$(nproc --all) \
+            2>&1 | tee out/build.log
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
+
+      - name: Clone AnyKernel3
+        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main anykernel-${{ matrix.battery_variant }}
+
+      - name: Move Kernel to AnyKernel3
+        run: |
+          mv ./kernel_base/out/arch/arm64/boot/Image anykernel-${{ matrix.battery_variant }}/
+          mv ./kernel_base/out/arch/arm64/boot/dtb anykernel-${{ matrix.battery_variant }}/
+          mv ./kernel_base/out/arch/arm64/boot/dtbo.img anykernel-${{ matrix.battery_variant }}/
+
+      - name: Define ZIP Name
+        run: |
+          COMPILED_DATE=$(date +%Y%m%d)
+          ZIP_NAME="RedlineFork-alioth(KSU)-${matrix.battery_variant}-${COMPILED_DATE}"
+          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
+          
+      - name: Create Flashable Kernel Zip
+        run: |
+          cd anykernel-${{ matrix.battery_variant }}
+          zip -r "../${ZIP_NAME}.zip" . -x ".git/*" ".github/*"
+
+      - name: Upload Kernel Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_NAME }}.zip
+          retention-days: 30
