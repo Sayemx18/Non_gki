@@ -155,11 +155,11 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          CAPTION="Redline Fork Kernel For alioth
-          Battery Variant: Stock
+          CAPTION="This is Raikiri Kernel For alioth"
+          add -5k to Zip name if you have 5kmah battery
           Thin Lto
-          Changelog:sync with lineage qcom sm8250
-          Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
+          Changelog:Latest changes from Los
+          kerrnel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
 
           curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
             -F chat_id="${TG_CHAT_ID}" \
