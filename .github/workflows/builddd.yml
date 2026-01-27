@@ -8,6 +8,10 @@ on:
         description: 'Kernel Tree'
         default: 'https://github.com/Sayemx18/kernel_xiaomi_sm8250.git'
         required: true
+      BRANCH:
+        description: 'Branch'
+        default: 'base'
+        required: true
       ANYKERNEL_URL:
         description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
         default: 'https://github.com/Sayemx18/AnyKernel3.git'
@@ -68,7 +72,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base Redlines
+          git clone --depth=1 --branch ${{ github.event.inputs.BRANCH }} ${{ github.event.inputs.KERNEL_TREE }} Redlines
 
       - name: Build Kernel
         run: |
@@ -81,6 +85,7 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd Redlines
+          git submodule update --init --recursive
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e LTO \
