@@ -1,4 +1,4 @@
-name: KBuild Redline
+name: Kernel Build Workflow 
 
 on:
   pull_request:
@@ -25,27 +25,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        branch: [base, 5kmah]
-        
     env:
       UPLOAD_TO_RELEASE: false
 
-    steps:               
+    steps:
       - name: Install Dependencies
         run: sudo apt install flex libncurses6
 
-      - name: Setup ccache  
-        uses: hendrikmuhs/ccache-action@v1.2  
-        with:  
-          key: kernel-build-${{ matrix.branch }}-${{ github.event.inputs.COMPILER }}-${{ github.sha }}  
-          restore-keys: |  
-            kernel-build-${{ matrix.branch }}-${{ github.event.inputs.COMPILER }}-  
-            kernel-build-${{ matrix.branch }}-  
-            kernel-build-  
-          max-size: 3G  
-          
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: kernel-build-${{ github.event.inputs.COMPILER }}-${{ github.sha }}
+          restore-keys: |
+            kernel-build-${{ github.event.inputs.COMPILER }}-
+            kernel-build-
+          max-size: 3G
+
       - name: Cache Clang Toolchain
         id: cache-clang
         uses: actions/cache@v4
@@ -73,7 +68,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b ${{ matrix.branch }} Redlines-${{ matrix.branch }}
+          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base Redlines
 
       - name: Build Kernel
         run: |
@@ -85,7 +80,7 @@ jobs:
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
-          cd Redlines-${{ matrix.branch }}
+          cd Redlines
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e LTO \
@@ -112,34 +107,32 @@ jobs:
       - name: Upload Images
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-artifacts-${{ matrix.branch }}
+          name: kernel-artifacts
           path: |
-            ./Redlines-${{ matrix.branch }}/out/arch/arm64/boot/Image
-            ./Redlines-${{ matrix.branch }}/out/arch/arm64/boot/dtb
-            ./Redlines-${{ matrix.branch }}/out/arch/arm64/boot/dtbo.img
-            ./Redlines-${{ matrix.branch }}/out/build.log
+            ./Redlines/out/arch/arm64/boot/Image
+            ./Redlines/out/arch/arm64/boot/dtb
+            ./Redlines/out/arch/arm64/boot/dtbo.img
+            ./Redlines/out/build.log
           if-no-files-found: ignore
           retention-days: 7
            
       - name: Clone AnyKernel3
-        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main anykernel-${{ matrix.branch }}
+        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main anykernel
 
       - name: Move Kernel Files to AnyKernel3
         run: |
-          mv ./Redlines-${{ matrix.branch }}/out/arch/arm64/boot/Image anykernel-${{ matrix.branch }}/
-          mv ./Redlines-${{ matrix.branch }}/out/arch/arm64/boot/dtb anykernel-${{ matrix.branch }}/
-          mv ./Redlines-${{ matrix.branch }}/out/arch/arm64/boot/dtbo.img anykernel-${{ matrix.branch }}/
+          mv ./Redlines/out/arch/arm64/boot/Image anykernel/
+          mv ./Redlines/out/arch/arm64/boot/dtb anykernel/
+          mv ./Redlines/out/arch/arm64/boot/dtbo.img anykernel/
 
-      - name: Define ZIP Name  
-        run: |  
-          COMPILED_DATE=$(date +%Y%m%d)  
-          BATTERY_VARIANT="${{ matrix.branch == '5kmah' && '5kmah' || 'Stock' }}"
-          echo "ZIP_NAME=RedlineFork-alioth(KSU)-${BATTERY_VARIANT}-${COMPILED_DATE}" >> $GITHUB_ENV  
-          echo "BATTERY_VARIANT=${BATTERY_VARIANT}" >> $GITHUB_ENV
+      - name: Define ZIP Name
+        run: |
+          COMPILED_DATE=$(date +%Y%m%d)
+          echo "ZIP_NAME=RedlineFork-alioth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
           
       - name: Create Flashable Kernel Zip
         run: |
-          cd anykernel-${{ matrix.branch }}
+          cd anykernel
           zip -r "../${ZIP_NAME}.zip" . -x ".git/*" ".github/*"
           
       - name: Upload Flashable Kernel Zip
@@ -149,21 +142,19 @@ jobs:
           path: ${{ env.ZIP_NAME }}.zip
           retention-days: 30
           
-      - name: Upload Kernel Zip to Telegram  
-        env:  
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}  
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  
-        run: |  
-          cd ..
-          CAPTION="Redline Fork Kernel For alioth  
-          Battery Variant: ${{ env.BATTERY_VARIANT }}  
-          Branch: ${{ matrix.branch }}
-          Thin Lto  
-          Changelog: sync with lineage qcom sm8250  
-          Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"  
+      - name: Upload Kernel Zip to Telegram
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          CAPTION="Redline Fork Kernel For alioth
+          Battery Variant: Stock
+          Thin Lto
+          Changelog:sync with lineage qcom sm8250
+          Kernel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
 
-          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \  
-            -F chat_id="${TG_CHAT_ID}" \  
-            -F document=@"${ZIP_NAME}.zip" \  
+          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TG_CHAT_ID}" \
+            -F document=@"${ZIP_NAME}.zip" \
             -F caption="$CAPTION"
       
