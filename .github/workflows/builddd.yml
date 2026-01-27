@@ -89,7 +89,7 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd Redlines
-          git submodule update --init --recursive
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e LTO \
