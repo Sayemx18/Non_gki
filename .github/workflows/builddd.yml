@@ -73,7 +73,11 @@ jobs:
       - name: Clone Repo
         run: |
           git clone --depth=1 --branch ${{ github.event.inputs.BRANCH }} ${{ github.event.inputs.KERNEL_TREE }} Redlines
-
+      - name: Clean
+        run: |
+          cd Redlines
+          rm -rf out
+      
       - name: Build Kernel
         run: |
           export PATH="$(pwd)/clang/bin:$PATH"
