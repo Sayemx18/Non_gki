@@ -71,13 +71,16 @@ jobs:
 
       - name: Revert Commits for 5kmah Variant
         run: |
-          cd kernel_base
+          cd kernel_base        
            if [[ "${{ matrix.battery }}" == "5kmah" ]]; then
+            git config --global user.email "sayemxx18@gmail.com"
+            git config --global user.name "sayem"
+            git remote add myrepo https://github.com/Sayemx18/kernel_xiaomi_sm8250.git
+            git fetch myrepo
             git revert --no-commit 1cdb6ca2c3ef5de1d2e3b0955dea40add27c2749
             git revert --no-commit bc1c8973e55c9aee9446fd493bffeb47a1e848f6
             git commit -m "Reverted two commits for 5kmah battery variant"
-           fi
-          
+           fi        
 
       - name: Build Kernel Variant
         run: |
