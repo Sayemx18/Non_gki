@@ -110,13 +110,13 @@ jobs:
 
       - name: Rename Dtbo/Dtb
         run: |
-         cp out/arch/arm64/boot/Image ../Image
+         cp kernel_base/out/arch/arm64/boot/Image ../Image
          if [[ "${{ matrix.battery }}" == "stock" ]]; then
-            cp out/arch/arm64/boot/dtbo.img ../dtbo-stock.img
-            cp out/arch/arm64/boot/dtb ../dtb-stock
+            cp kernel_base/out/arch/arm64/boot/dtbo.img ../dtbo-stock.img
+            cp kernel_base/out/arch/arm64/boot/dtb ../dtb-stock
          else
-            cp out/arch/arm64/boot/dtbo.img ../j3s-dtbo.img
-            cp out/arch/arm64/boot/dtb ../dtb-5kmah
+            cp kernel_base/out/arch/arm64/boot/dtbo.img ../j3s-dtbo.img
+            cp kernel_base/out/arch/arm64/boot/dtb ../dtb-5kmah
           fi
           
   package_anykernel:
@@ -143,7 +143,7 @@ jobs:
       - name: Create Flashable Zip
         run: |
           cd anykernel
-          ZIP_NAME="RedlineFork-alioth(KSU)-Stock+5kmah-$(date +%Y%m%d).zip"
+          ZIP_NAME="RedlineFork-alioth(KSU)-$(date +%Y%m%d).zip"
           zip -r "../${ZIP_NAME}" . -x ".git/*" ".github/*"
 
       - name: Upload Kernel Zip
