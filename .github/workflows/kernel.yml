@@ -89,9 +89,6 @@ jobs:
           cd kernel_base
           make O=out alioth_defconfig
           scripts/config --file out/.config \
-            -e LTO \
-            -e THINLTO \
-            -e LTO_CLANG \
             -e KSU \
             -e KSU_MANUAL_HOOK
           make O=out \
