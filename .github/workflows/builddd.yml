@@ -136,7 +136,7 @@ jobs:
       - name: Define ZIP Name
         run: |
           COMPILED_DATE=$(date +%Y%m%d)
-          echo "ZIP_NAME=RedlineFork-alioth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
+          echo "ZIP_NAME=Raikiri-v1.0-alioth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
           
       - name: Create Flashable Kernel Zip
         run: |
@@ -155,9 +155,10 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          CAPTION="This is Raikiri Kernel For alioth"
-          add -5k to Zip name if you have 5kmah battery
+          CAPTION="This is Raikiri Kernel For alioth
+          add -5k in the Zip name if you have 5kmah battery
           Thin Lto
+          Support Ksu-next v3.x.x
           Changelog:Latest changes from Los
           kerrnel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
 
