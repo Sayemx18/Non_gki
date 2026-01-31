@@ -24,9 +24,11 @@ on:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        kernel: [aosp, miui, aosp5k, miui5k]
     runs-on: ubuntu-latest
-    env:
-      UPLOAD_TO_RELEASE: false
+    
 
     steps:
       - name: Install Dependencies
@@ -51,21 +53,24 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b uvite RedlineFork
+          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
 
-      - name: Lets cherry-pick
-        run : | 
+      - name: 5k Dtbo
+        if: matrix.kernel == 'aosp5k' || matrix.kernel == 'miui5k'
+        run: |
           git config --global user.email "sayemxx18@gmail.com"
           git config --global user.name "sayem"
-          cd RedlineFork
-          git remote add mymods https://github.com/Sayemx18/kernel_xiaomi_sm8250.git
-          git fetch mymods
-          git cherry-pick 88667341c364a7ba711085491fe57e2a803af76a^..23728680189d42a5ffbbfddd2670d20c9fae588a
-          git cherry-pick 8ece70fba1d93fe623c6df4309afda4dd113d55f^..a852125b89f871fdf6a82fba34b8f2733eff0f79
+          cd k_tree
           git fetch origin
-          git revert 1cdb6ca2c3ef5de1d2e3b0955dea40add27c2749
-          git revert bc1c8973e55c9aee9446fd493bffeb47a1e848f6
+          git cherry-pick 1cdb6ca2c3ef5de1d2e3b0955dea40add27c2749
 
+      - name: Display Dimensions miui
+        if:  matrix.kernel == 'miui' || matrix.kernel == 'miui5k'
+        run: |
+          cd k_tree
+          sed -i 's/<70>/<695>/g' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi
+          sed -i 's/<155>/<1546>/g' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi         
+                              
       - name: Build Kernel
         run: |
           export PATH="$(pwd)/clang/bin:$PATH"
@@ -74,13 +79,13 @@ jobs:
           export KBUILD_BUILD_USER="sayem"
           export KBUILD_BUILD_HOST="Sayemx18"
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
-          cd RedlineFork
-          make O=out vendor/alioth_defconfig
+          cd k_tree
+          make O=out alioth_defconfig
           make O=out CC=clang -j$(nproc --all) CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
-          echo "all files:"
-          ls -lhaR out/arch/arm64/boot/
-
+          
+          
+          
       - name: Upload Image
         uses: actions/upload-artifact@v4
         with:
