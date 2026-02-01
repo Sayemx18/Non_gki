@@ -103,7 +103,7 @@ jobs:
           export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
-          cd Redlines
+          cd k_tree
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e KSU \
