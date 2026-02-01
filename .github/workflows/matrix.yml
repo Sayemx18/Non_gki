@@ -1,0 +1,202 @@
+name: Build matrix alioth
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      KERNEL_TREE:
+        description: 'Kernel Tree'
+        default: 'https://github.com/Sayemx18/kernel_xiaomi_sm8250.git'
+        required: true
+      ANYKERNEL_URL:
+        description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
+        default: 'https://github.com/Sayemx18/AnyKernel3.git'
+        required: false
+      COMPILER:
+        description: 'Choose compiler'
+        required: true
+        type: choice
+        options:
+          - neutron
+          - aosp
+          - aosp-21
+        default: aosp
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        kernel: [aosp, miui, aosp5k, miui5k]
+    runs-on: ubuntu-latest
+    
+
+    steps:
+      - name: Install Dependencies
+        run: sudo apt install flex libncurses6
+        
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: kernel-build-${{ github.event.inputs.COMPILER }}-${{ github.sha }}
+          restore-keys: |
+            kernel-build-${{ github.event.inputs.COMPILER }}-
+            kernel-build-
+          max-size: 3G
+
+      - name: Cache Clang Toolchain
+        id: cache-clang
+        uses: actions/cache@v4
+        with:
+          path: clang
+          key: clang-${{ github.event.inputs.COMPILER }}-v1
+          
+
+      - name: Download & Extract Clang
+        run: |
+          if [[ "${{ github.event.inputs.COMPILER }}" == "aosp" ]]; then
+            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
+            mkdir clang
+            tar -xf clang.tar.gz -C clang
+          elif [[ "${{ github.event.inputs.COMPILER }}" == "aosp-21" ]]; then
+            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/ebcc6c3bef363bc539ea39f45b6abae1dce6ff1a/clang-r574158.tar.gz -O clang.tar.gz
+            mkdir clang
+            tar -xf clang.tar.gz -C clang
+          else
+            wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
+            mkdir clang
+            unzstd -d clang.tar.zst
+            tar -xf clang.tar -C clang
+          fi
+
+      - name: Clone Repo
+        run: |
+          git clone --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
+
+      - name : Revert Unnecessary Commit For Alioth
+        run: |
+         cd k_tree
+         git config --global user.email "sayemxx18@gmail.com"
+         git config --global user.name "sayem"
+         git revert b688caea16c0be4110577e26037a63734d90e8a1
+        
+      - name: 5k Dtbo
+        if: matrix.kernel == 'aosp5k' || matrix.kernel == 'miui5k'
+        run: |
+          cd k_tree
+          git fetch origin
+          git cherry-pick 1cdb6ca2c3ef5de1d2e3b0955dea40add27c2749
+
+      - name: Display Dimensions miui
+        if:  matrix.kernel == 'miui' || matrix.kernel == 'miui5k'
+        run: |
+          cd k_tree
+          sed -i 's/<70>/<695>/g' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi
+          sed -i 's/<155>/<1546>/g' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi         
+                              
+      - name: Build Kernel
+        run: |
+          export PATH="$(pwd)/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=ARM64
+          export KBUILD_BUILD_USER="sayem"
+          export KBUILD_BUILD_HOST="Sayemx18"
+          export KBUILD_BUILD_TIMESTAMP="$(TZ=UTC-7 date)"
+          export USE_CCACHE=1
+          export CCACHE_EXEC=/usr/bin/ccache
+          cd Redlines
+          make O=out alioth_defconfig
+          scripts/config --file out/.config \
+            -e KSU \
+            -e KSU_MANUAL_HOOK
+            
+          make O=out \
+            ARCH=arm64 \
+            SUBARCH=arm64 \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CC="ccache clang" \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            -j$(nproc --all) \
+            2>&1 | tee out/build.log
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+          if [[ "${{ matrix.kernel }}" == 'aosp' ]]; then
+            cp out/arch/arm64/boot/Image ../Image
+            mv out/arch/arm64/boot/dtbo.img ../dtbo.img
+            mv out/arch/arm64/boot/dtb ../dtb
+          elif [[ "${{ matrix.kernel }}" == 'aosp5k' ]]; then
+            mv out/arch/arm64/boot/dtbo.img ../5k-dtbo.img
+          elif [[ "${{ matrix.kernel }}" == 'miui' ]]; then
+            mv out/arch/arm64/boot/dtbo.img ../miui-dtbo.img
+          else
+            mv out/arch/arm64/boot/dtbo.img ../miui-5k-dtbo.img
+          fi
+                          
+      - name: Upload Kernel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ matrix.kernel }}
+          path: |
+            *.img
+            dtb
+            Image
+ 
+  package_anykernel:
+     needs: build
+     runs-on: ubuntu-latest
+
+     steps:
+      - name: Download Kernel Build Original
+        uses: actions/download-artifact@v4
+        with:
+          name: kernel-aosp
+          path: kernel-aosp
+
+      - name: Download Kernel Build Original
+        uses: actions/download-artifact@v4
+        with:
+          name: kernel-miui
+          path: kernel-miui
+
+      - name: Download Kernel Build Original
+        uses: actions/download-artifact@v4
+        with:
+          name: kernel-aosp5k
+          path: kernel-aosp5k
+
+      - name: Download Kernel Build Original
+        uses: actions/download-artifact@v4
+        with:
+          name: kernel-miui5k
+          path: kernel-miui5k
+
+      - name: Clone AnyKernel3
+        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main AnyKernel3
+        
+      - name: Move Kernel Files to AnyKernel3
+        run: |
+          mv kernel-aosp/* AnyKernel3/
+          mv kernel-miui/* AnyKernel3/
+          mv kernel-aosp5k/* AnyKernel3/
+          mv kernel-miui5k/* AnyKernel3/
+
+      - name: Define ZIP Name
+        run: |
+          COMPILED_DATE=$(date +%Y%m%d)
+          echo "ZIP_NAME=Raikiri-v2.0-alioth-${COMPILED_DATE}" >> $GITHUB_ENV
+          
+      - name: Upload Flashable Kernel Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: |
+            AnyKernel3/
+            !AnyKernel3/.git
+            !AnyKernel3/.github
+        
+          
+  
+      
