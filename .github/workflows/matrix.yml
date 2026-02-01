@@ -125,7 +125,7 @@ jobs:
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
           if [[ "${{ matrix.kernel }}" == 'aosp' ]]; then
             cp out/arch/arm64/boot/Image ../Image
-            mv out/arch/arm64/boot/dtbo.img ../dtbo.img
+            mv out/arch/arm64/boot/dtbo.img ../stock-dtbo.img
             mv out/arch/arm64/boot/dtb ../dtb
           elif [[ "${{ matrix.kernel }}" == 'aosp5k' ]]; then
             mv out/arch/arm64/boot/dtbo.img ../5k-dtbo.img
