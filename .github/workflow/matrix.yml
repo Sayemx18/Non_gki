@@ -6,7 +6,7 @@ on:
     inputs:
       KERNEL_TREE:
         description: 'Kernel Tree'
-        default: 'https://github.com/PocoF3Releases/kernel_xiaomi_sm8250.git'
+        default: 'https://github.com/Sayemx18/kernel_xiaomi_sm8250.git'
         required: true
       ANYKERNEL_URL:
         description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
