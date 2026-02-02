@@ -22,10 +22,6 @@ on:
           - aosp-21
           - zyc
         default: aosp
-      Clean Build:
-        description: 'Clean Build'
-        required: true
-        default: "no"
         
 jobs:
   build:
@@ -104,12 +100,6 @@ jobs:
       -  name: Clone Repo
          run: |
           git clone --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
-
-      - name: Clean Build
-        if: ${{ github.event.inputs.clean_build == 'yes' }}
-        run: |
-          echo "Clean build enabled"
-          rm -rf out
                               
       - name: Build Kernel
         run: |
