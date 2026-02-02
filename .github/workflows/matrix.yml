@@ -52,22 +52,21 @@ jobs:
           
 
       - name: Download & Extract Clang
-        if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
           if [[ "${{ github.event.inputs.COMPILER }}" == "aosp" ]]; then
             wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
-            mkdir clang
-            tar -xf clang.tar.gz -C clang
+            mkdir toolchain
+            tar -xf clang.tar.gz -C toolchain
           elif [[ "${{ github.event.inputs.COMPILER }}" == "aosp-21" ]]; then
             wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/ebcc6c3bef363bc539ea39f45b6abae1dce6ff1a/clang-r574158.tar.gz -O clang.tar.gz
-            mkdir clang
-            tar -xf clang.tar.gz -C clang
+            mkdir toolchain
+            tar -xf clang.tar.gz -C toolchain
           else
             wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
-            mkdir clang
+            mkdir toolchain
             unzstd -d clang.tar.zst
-            tar -xf clang.tar -C clang
-          fi      
+            tar -xf clang.tar -C toolchain
+          fi
 
       - name: Clone Repo
         run: |
@@ -78,7 +77,6 @@ jobs:
          cd k_tree
          git config --global user.email "sayemxx18@gmail.com"
          git config --global user.name "sayem"
-         git fetch origin
          git revert b688caea16c0be4110577e26037a63734d90e8a1
         
       - name: 5k Dtbo
