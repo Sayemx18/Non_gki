@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         kernel: [aosp, miui, aosp5k, miui5k]
-    runs-on: ubuntu-22.04 
+    runs-on: ubuntu-latest
     
 
     steps:
@@ -159,7 +159,7 @@ jobs:
  
   package_anykernel:
      needs: build
-     runs-on: ubuntu-22.04
+     runs-on: ubuntu-latest
 
      steps:
       - name: Download Kernel Build Original
