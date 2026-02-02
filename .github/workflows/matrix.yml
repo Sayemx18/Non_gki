@@ -115,8 +115,8 @@ jobs:
           make O=out alioth_defconfig
           scripts/config --file out/.config \
             -e KSU \
-            -e KSU_MANUAL_HOOK
-            
+            -e KSU_MANUAL_HOOK \
+            -e THERMAL_DIMMING
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
