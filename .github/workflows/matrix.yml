@@ -78,6 +78,7 @@ jobs:
          cd k_tree
          git config --global user.email "sayemxx18@gmail.com"
          git config --global user.name "sayem"
+         git fetch origin
          git revert b688caea16c0be4110577e26037a63734d90e8a1
         
       - name: 5k Dtbo
@@ -91,8 +92,8 @@ jobs:
         if:  matrix.kernel == 'miui' || matrix.kernel == 'miui5k'
         run: |
           cd k_tree
-          sed -i 's/<70>/<695>/g' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi
-          sed -i 's/<155>/<1546>/g' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi         
+          git fetch origin
+          git revert b0e5d52a8859b41f6d34861b2a60d72ffa3be3cc
                               
       - name: Build Kernel
         run: |
