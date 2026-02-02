@@ -52,8 +52,8 @@ jobs:
           
 
       - name: Download & Extract Clang
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
-          steps.cache-toolchain.outputs.cache-hit != 'true'
           if [[ "${{ github.event.inputs.COMPILER }}" == "aosp" ]]; then
             wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
             mkdir toolchain
