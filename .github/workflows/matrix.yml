@@ -117,7 +117,11 @@ jobs:
             -e KSU \
             -e KSU_MANUAL_HOOK \
             -e THERMAL_DIMMING \
-            -e FAKE_UNAME_5_15=y
+            -e FAKE_UNAME_5_15
+            
+          grep THERMAL_DIMMING out/.config
+          grep FAKE_UNAME_5_15=y out/.config
+          
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
