@@ -78,7 +78,8 @@ jobs:
          cd k_tree
          git config --global user.email "sayemxx18@gmail.com"
          git config --global user.name "sayem"
-         git revert b688caea16c0be4110577e26037a63734d90e8a1
+         git fetch origin
+         git cherry-pick 313faa8ccdb50fbbf375b66e5e724bc972647ab9
         
       - name: 5k Dtbo
         if: matrix.kernel == 'aosp5k' || matrix.kernel == 'miui5k'
