@@ -73,7 +73,11 @@ jobs:
              mkdir toolchain
              unzstd -d clang.tar.zst
              tar -xf clang.tar -C toolchain
-          fi       
+          fi     
+
+      -  name: Clone Repo
+         run: |
+          git clone --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
 
       - name : Revert Unnecessary Commit For Alioth
         run: |
@@ -96,10 +100,6 @@ jobs:
           cd k_tree
           git fetch origin
           git cherry-pick 2184d03ff9cdc3374f5b947cc7cd78f89cf705ad
-
-      -  name: Clone Repo
-         run: |
-          git clone --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
                               
       - name: Build Kernel
         run: |
