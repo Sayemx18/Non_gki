@@ -25,11 +25,7 @@ on:
       Clean Build:
         description: 'Clean Build'
         required: true
-        type: choice
-        options:
-           - yes
-           - no
-        default: no
+        default: "no"
         
 jobs:
   build:
