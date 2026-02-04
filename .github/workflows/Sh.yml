@@ -1,0 +1,73 @@
+name: Alioth Kernel (Matrix + Bash + Telegram)
+
+on:
+  workflow_dispatch:
+    inputs:
+      COMPILER:
+        description: "Compiler"
+        required: true
+        default: aosp
+        type: choice
+        options:
+          - aosp
+          - aosp-21
+          - neutron
+          - zyc
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [aosp, miui, aosp5k, miui5k]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt update
+          sudo apt install -y git wget flex libncurses6 \
+            ccache zip zstd curl
+
+      - name: Build (${{ matrix.variant }})
+        run: |
+          chmod +x build_alioth.sh
+          COMPILER=${{ inputs.COMPILER }} \
+          KERNEL_VARIANT=${{ matrix.variant }} \
+          bash build_alioth.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ matrix.variant }}
+          path: "*.zip"
+
+#  telegram:
+ #   needs: build
+#    runs-on: ubuntu-22.04
+
+ #   steps:
+#      - name: Download artifacts
+#        uses: actions/download-artifact@v4
+ #       with:
+      #    path: out
+
+      #- name: Send to Telegram
+        #env:
+          #BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          #CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+       # run: |
+         # for zip in out/**/**/*.zip; do
+       #     curl -s -X POST \
+        #      https://api.telegram.org/bot${BOT_TOKEN}/sendDocument \
+           #   -F chat_id=${CHAT_ID} \
+       #       -F document=@"$zip" \
+            #  -F caption="Alioth Kernel Build
+              
+       #    Variant: *$(basename "$(dirname "$zip")")*
+      #     Compiler: *${{ inputs.COMPILER }}*
+  #         File: \`$(basename "$zip")\`" \
+    #          -F parse_mode=Markdown
+   #       done
