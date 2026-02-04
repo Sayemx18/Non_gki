@@ -27,6 +27,8 @@ jobs:
         variant: [aosp, miui, aosp5k, miui5k]
 
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y flex libncurses6 bc ccache git wget tar xz-utils zstd
         
