@@ -33,7 +33,7 @@ jobs:
 
       - name: Build (${{ matrix.variant }})
         run: |
-          chmod +x build_alioth.sh
+          chmod +x build.sh
           COMPILER=${{ inputs.COMPILER }} \
           KERNEL_VARIANT=${{ matrix.variant }} \
           bash build.sh
