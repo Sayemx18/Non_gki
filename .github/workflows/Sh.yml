@@ -14,10 +14,6 @@ on:
           - neutron
           - zyc
 
-      KERNEL_TREE:
-        default: https://github.com/Sayemx18/kernel_xiaomi_sm8250.git
-        required: true
-
       ANYKERNEL_URL:
         default: https://github.com/Sayemx18/AnyKernel3.git
         required: true
@@ -33,11 +29,13 @@ jobs:
     steps:
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y flex libncurses6 bc ccache git wget tar xz-utils zstd
-
-      - name: Build Kernel
+        
+      - name: Build (${{ matrix.variant }})
         run: |
           chmod +x build.sh
-          VARIANT=${{ matrix.variant }} COMPILER=${{ inputs.COMPILER }} ./build.sh
+          COMPILER=${{ inputs.COMPILER }} \
+          KERNEL_VARIANT=${{ matrix.variant }} \
+          bash build.sh
 
       - name: Upload Kernel Artifacts
         uses: actions/upload-artifact@v4
