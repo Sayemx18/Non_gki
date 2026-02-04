@@ -31,20 +31,15 @@ jobs:
         variant: [aosp, miui, aosp5k, miui5k]
 
     steps:
-      - name: Install deps
+      - name: Install dependencies
         run: sudo apt update && sudo apt install -y flex libncurses6 bc ccache git wget tar xz-utils zstd
 
-      - name: Clone kernel
-        run: git clone --recurse-submodules ${{ inputs.KERNEL_TREE }} k_tree
-
-      - name: Build (${{ matrix.variant }})
+      - name: Build Kernel
         run: |
           chmod +x build.sh
-          COMPILER=${{ inputs.COMPILER }} \
-          VARIANT=${{ matrix.variant }} \
-          bash build.sh
-          
-      - name: Upload artifact
+          VARIANT=${{ matrix.variant }} COMPILER=${{ inputs.COMPILER }} ./build.sh
+
+      - name: Upload Kernel Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-${{ matrix.variant }}
@@ -63,21 +58,21 @@ jobs:
       - name: Clone AnyKernel3
         run: git clone --depth=1 ${{ inputs.ANYKERNEL_URL }} AnyKernel3
 
-      - name: Merge all variants
+      - name: Merge all variants safely
         run: |
           cp kernels/kernel-aosp/* AnyKernel3/
           cp kernels/kernel-miui/* AnyKernel3/
           cp kernels/kernel-aosp5k/* AnyKernel3/
           cp kernels/kernel-miui5k/* AnyKernel3/
 
-      - name: Create zip
+      - name: Create flashable zip
         run: |
           DATE=$(date +%Y%m%d)
           cd AnyKernel3
-          zip -r ../Raikiri-v1.1-alioth-$DATE.zip .
+          zip -r ../Raikiri-v1.1-alioth-$DATE.zip . -x ".git/*" ".github/*"
 
-      - name: Upload flashable zip
+      - name: Upload final AnyKernel zip
         uses: actions/upload-artifact@v4
         with:
-          name: Raikiri-alioth
+          name: Raikiri-alioth-v1.1
           path: Raikiri-v1.1-alioth-*.zip
