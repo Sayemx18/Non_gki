@@ -36,7 +36,7 @@ jobs:
           chmod +x build_alioth.sh
           COMPILER=${{ inputs.COMPILER }} \
           KERNEL_VARIANT=${{ matrix.variant }} \
-          bash build_alioth.sh
+          bash build.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
