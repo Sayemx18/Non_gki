@@ -1,18 +1,26 @@
-name: Alioth Kernel (Matrix + Bash + Telegram)
+name: Alioth Kernel Matrix Build
 
 on:
   workflow_dispatch:
     inputs:
       COMPILER:
-        description: "Compiler"
+        description: Choose compiler
+        type: choice
         required: true
         default: aosp
-        type: choice
         options:
           - aosp
           - aosp-21
           - neutron
           - zyc
+
+      KERNEL_TREE:
+        default: https://github.com/Sayemx18/kernel_xiaomi_sm8250.git
+        required: true
+
+      ANYKERNEL_URL:
+        default: https://github.com/Sayemx18/AnyKernel3.git
+        required: true
 
 jobs:
   build:
@@ -23,51 +31,53 @@ jobs:
         variant: [aosp, miui, aosp5k, miui5k]
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Install deps
-        run: |
-          sudo apt update
-          sudo apt install -y git wget flex libncurses6 \
-            ccache zip zstd curl
+        run: sudo apt update && sudo apt install -y flex libncurses6 bc ccache git wget tar xz-utils zstd
+
+      - name: Clone kernel
+        run: git clone --recurse-submodules ${{ inputs.KERNEL_TREE }} k_tree
 
       - name: Build (${{ matrix.variant }})
         run: |
           chmod +x build.sh
           COMPILER=${{ inputs.COMPILER }} \
-          KERNEL_VARIANT=${{ matrix.variant }} \
+          VARIANT=${{ matrix.variant }} \
           bash build.sh
-
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: kernel-${{ matrix.variant }}
-          path: "*.zip"
+          path: out_artifacts/${{ matrix.variant }}/
 
-#  telegram:
- #   needs: build
-#    runs-on: ubuntu-22.04
+  package:
+    needs: build
+    runs-on: ubuntu-22.04
 
- #   steps:
-#      - name: Download artifacts
-#        uses: actions/download-artifact@v4
- #       with:
-      #    path: out
+    steps:
+      - name: Download all kernel builds
+        uses: actions/download-artifact@v4
+        with:
+          path: kernels
 
-      #- name: Send to Telegram
-        #env:
-          #BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          #CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-       # run: |
-         # for zip in out/**/**/*.zip; do
-       #     curl -s -X POST \
-        #      https://api.telegram.org/bot${BOT_TOKEN}/sendDocument \
-           #   -F chat_id=${CHAT_ID} \
-       #       -F document=@"$zip" \
-            #  -F caption="Alioth Kernel Build
-              
-       #    Variant: *$(basename "$(dirname "$zip")")*
-      #     Compiler: *${{ inputs.COMPILER }}*
-  #         File: \`$(basename "$zip")\`" \
-    #          -F parse_mode=Markdown
-   #       done
+      - name: Clone AnyKernel3
+        run: git clone --depth=1 ${{ inputs.ANYKERNEL_URL }} AnyKernel3
+
+      - name: Merge all variants
+        run: |
+          cp kernels/kernel-aosp/* AnyKernel3/
+          cp kernels/kernel-miui/* AnyKernel3/
+          cp kernels/kernel-aosp5k/* AnyKernel3/
+          cp kernels/kernel-miui5k/* AnyKernel3/
+
+      - name: Create zip
+        run: |
+          DATE=$(date +%Y%m%d)
+          cd AnyKernel3
+          zip -r ../Raikiri-v1.1-alioth-$DATE.zip .
+
+      - name: Upload flashable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Raikiri-alioth
+          path: Raikiri-v1.1-alioth-*.zip
