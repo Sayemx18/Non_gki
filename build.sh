@@ -51,7 +51,7 @@ if [ ! -d k_tree ]; then
 fi
 
 cd k_tree
-git clean -fdx
+
 
 git cherry-pick 313faa8ccdb50fbbf375b66e5e724bc972647ab9 || true
 
@@ -82,7 +82,9 @@ make O=out \
 
 find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
 
-# ---------- OUTPUT ----------
+OUT="out_artifacts/$KERNEL_VARIANT"
+mkdir -p "$OUT"
+
 if [[ "$KERNEL_VARIANT" == "aosp" ]]; then
   cp out/arch/arm64/boot/Image "$OUT/"
   cp out/arch/arm64/boot/dtb "$OUT/"
