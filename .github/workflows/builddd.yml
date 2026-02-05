@@ -142,20 +142,20 @@ jobs:
           path: ${{ env.ZIP_NAME }}.zip
           retention-days: 30
           
-      - name: Upload Kernel Zip to Telegram
-        env:
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: |
-          CAPTION="This is Raikiri Kernel For alioth
-          add -5k in the Zip name if you have 5kmah battery
-          Thin Lto
-          Support Ksu-next v3.x.x
-          Changelog:Latest changes from Los
-          kerrnel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
+#      - name: Upload Kernel Zip to Telegram
+  #      env:
+       #   TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+    #      TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+#        run: |
+         # CAPTION="This is Raikiri Kernel For alioth
+   #       add -5k in the Zip name if you have 5kmah battery
+       #   Thin Lto
+   #       Support Ksu-next v3.x.x
+   #       Changelog:Latest changes from Los
+   #       kerrnel Source: https://github.com/Sayemx18/kernel_xiaomi_sm8250"
 
-          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
-            -F chat_id="${TG_CHAT_ID}" \
-            -F document=@"${ZIP_NAME}.zip" \
-            -F caption="$CAPTION"
+    #      curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
+     #       -F chat_id="${TG_CHAT_ID}" \
+      #      -F document=@"${ZIP_NAME}.zip" \
+       #     -F caption="$CAPTION"
       
