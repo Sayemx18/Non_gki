@@ -10,7 +10,7 @@ on:
         required: true
       BRANCH:
         description: 'Branch'
-        default: 'base'
+        default: 'backup'
         required: true
       ANYKERNEL_URL:
         description: 'AnyKernel Url (leave blank if you dont want AnyKernel)'
@@ -117,7 +117,7 @@ jobs:
           retention-days: 7
            
       - name: Clone AnyKernel3
-        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b main anykernel
+        run: git clone --recursive --depth=1 ${{ github.event.inputs.ANYKERNEL_URL }} -b arrow anykernel
 
       - name: Move Kernel Files to AnyKernel3
         run: |
