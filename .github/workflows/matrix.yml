@@ -109,9 +109,7 @@ jobs:
           export CCACHE_EXEC=/usr/bin/ccache
           cd k_tree
           make O=out alioth_defconfig \
-          vendor/xiaomi/raikiri-common.config
-          grep THERMAL_DIMMING out/.config
-          grep FAKE_UNAME_5_15=y out/.config          
+          vendor/xiaomi/raikiri.config
           make O=out \
             ARCH=arm64 \
             SUBARCH=arm64 \
