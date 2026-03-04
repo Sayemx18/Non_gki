@@ -92,6 +92,8 @@ jobs:
         if:  matrix.kernel == 'miui' || matrix.kernel == 'miui5k'
         run: |
           cd k_tree
+          git config --global user.email "sayemxx18@gmail.com"
+          git config --global user.name "sayem"
           git fetch origin
           git cherry-pick 2184d03ff9cdc3374f5b947cc7cd78f89cf705ad
                               
