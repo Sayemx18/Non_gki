@@ -21,6 +21,7 @@ on:
           - aosp
           - aosp-21
           - zyc
+          - aosp-22
         default: aosp
         
 jobs:
