@@ -69,7 +69,7 @@ jobs:
             mkdir toolchain
             unzstd -d clang.tar.zst
             tar -xf clang.tar -C toolchain
-          elif[ "${{ github.event.inputs.COMPILER }}" == "aosp-22" ]]; then
+          elif [ "${{ github.event.inputs.COMPILER }}" == "aosp-22" ]]; then
             wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r584948.tar.gz
             mkdir toolchain
             tar -xf clang.tar.gz -C toolchain
