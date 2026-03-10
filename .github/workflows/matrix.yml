@@ -113,7 +113,6 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd k_tree
-          rm -rf out
           make O=out alioth_defconfig \
           vendor/xiaomi/raikiri.config
           make O=out \
