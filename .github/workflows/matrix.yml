@@ -113,9 +113,8 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd k_tree
-          make O=out LLVM=1 \
-          ARCH=arm64 \
-          CC="ccache clang" \
+          make O=out LLVM=1 ARCH=arm64 \
+          CC="$_CC_clang" \
           LD=ld.lld \
           AR=llvm-ar \
           AS=llvm-as \
@@ -124,21 +123,29 @@ jobs:
           OBJCOPY=llvm-objcopy \
           OBJDUMP=llvm-objdump \
           READELF=llvm-readelf \
-          HOSTCC=clang \
-          HOSTCXX=clang++ \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          alioth_defconfig
-          make O=out vendor/xiaomi/raikiri.config
-          make -j$(nproc --all) O=out \
+          HOSTCC="$_CC_host" \
+          HOSTCXX="$_CXX_host" \
+          HOSTAR=llvm-ar \
+          HOSTLD=ld.lld \
+          CROSS_COMPILE=arm64-linux-gnu- \
+          alioth_defconfig \
+          vendor/xiaomi/raikiri.config
+          make -j$(nproc --all) O=out LLVM=1 \
           ARCH=arm64 \
-          LLVM=1 \
-          LLVM_IAS=1 \
-          CC="ccache clang" \
-          HOSTCC=clang \
-          HOSTCXX=clang++ \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CC="$_CC_clang" \
+          LD=ld.lld \
+          AR=llvm-ar \
+          AS=llvm-as \
+          NM=llvm-nm \
+          STRIP=llvm-strip \
+          OBJCOPY=llvm-objcopy \
+          OBJDUMP=llvm-objdump \
+          READELF=llvm-readelf \
+          HOSTCC="$_CC_host" \
+          HOSTCXX="$_CXX_host" \
+          HOSTAR=llvm-ar \
+          HOSTLD=ld.lld \
+          CROSS_COMPILE=arm64-linux-gnu- \
           2>&1 | tee out/build.log
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
           if [[ "${{ matrix.kernel }}" == 'aosp' ]]; then
