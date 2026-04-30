@@ -113,8 +113,9 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd k_tree
+          echo "Generating defconfig..."
           make O=out LLVM=1 ARCH=arm64 \
-            CC="$_CC_clang" \
+            CC=clang \
             LD=ld.lld \
             AR=llvm-ar \
             AS=llvm-as \
@@ -123,16 +124,17 @@ jobs:
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             READELF=llvm-readelf \
-            HOSTCC="$_CC_host" \
-            HOSTCXX="$_CXX_host" \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
             HOSTAR=llvm-ar \
             HOSTLD=ld.lld \
-            CROSS_COMPILE=arm64-linux-gnu- \
-            alioth_defconfig \
-            vendor/xiaomi/raikiri.config
-            make -j$(nproc --all) O=out LLVM=1 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            alioth_defconfig
+
+          echo "Starting compilation..."
+          make -j$(nproc --all) O=out LLVM=1 \
             ARCH=arm64 \
-            CC="$_CC_clang" \
+            CC=clang \
             LD=ld.lld \
             AR=llvm-ar \
             AS=llvm-as \
@@ -141,13 +143,13 @@ jobs:
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             READELF=llvm-readelf \
-            HOSTCC="$_CC_host" \
-            HOSTCXX="$_CXX_host" \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
             HOSTAR=llvm-ar \
             HOSTLD=ld.lld \
-            CROSS_COMPILE=arm64-linux-gnu- \
-            2>&1 | tee out/build.log
-            find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+            CROSS_COMPILE=aarch64-linux-gnu-
+            
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
             if [[ "${{ matrix.kernel }}" == 'aosp' ]]; then
             cp out/arch/arm64/boot/Image ../Image
             mv out/arch/arm64/boot/dtbo.img ../stock-dtbo.img
