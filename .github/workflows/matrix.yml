@@ -114,41 +114,41 @@ jobs:
           export CCACHE_EXEC=/usr/bin/ccache
           cd k_tree
           make O=out LLVM=1 ARCH=arm64 \
-          CC="$_CC_clang" \
-          LD=ld.lld \
-          AR=llvm-ar \
-          AS=llvm-as \
-          NM=llvm-nm \
-          STRIP=llvm-strip \
-          OBJCOPY=llvm-objcopy \
-          OBJDUMP=llvm-objdump \
-          READELF=llvm-readelf \
-          HOSTCC="$_CC_host" \
-          HOSTCXX="$_CXX_host" \
-          HOSTAR=llvm-ar \
-          HOSTLD=ld.lld \
-          CROSS_COMPILE=arm64-linux-gnu- \
-          alioth_defconfig \
-          vendor/xiaomi/raikiri.config
-          make -j$(nproc --all) O=out LLVM=1 \
-          ARCH=arm64 \
-          CC="$_CC_clang" \
-          LD=ld.lld \
-          AR=llvm-ar \
-          AS=llvm-as \
-          NM=llvm-nm \
-          STRIP=llvm-strip \
-          OBJCOPY=llvm-objcopy \
-          OBJDUMP=llvm-objdump \
-          READELF=llvm-readelf \
-          HOSTCC="$_CC_host" \
-          HOSTCXX="$_CXX_host" \
-          HOSTAR=llvm-ar \
-          HOSTLD=ld.lld \
-          CROSS_COMPILE=arm64-linux-gnu- \
-          2>&1 | tee out/build.log
-          find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
-          if [[ "${{ matrix.kernel }}" == 'aosp' ]]; then
+            CC="$_CC_clang" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            AS=llvm-as \
+            NM=llvm-nm \
+            STRIP=llvm-strip \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            READELF=llvm-readelf \
+            HOSTCC="$_CC_host" \
+            HOSTCXX="$_CXX_host" \
+            HOSTAR=llvm-ar \
+            HOSTLD=ld.lld \
+            CROSS_COMPILE=arm64-linux-gnu- \
+            alioth_defconfig \
+            vendor/xiaomi/raikiri.config
+            make -j$(nproc --all) O=out LLVM=1 \
+            ARCH=arm64 \
+            CC="$_CC_clang" \
+            LD=ld.lld \
+            AR=llvm-ar \
+            AS=llvm-as \
+            NM=llvm-nm \
+            STRIP=llvm-strip \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            READELF=llvm-readelf \
+            HOSTCC="$_CC_host" \
+            HOSTCXX="$_CXX_host" \
+            HOSTAR=llvm-ar \
+            HOSTLD=ld.lld \
+            CROSS_COMPILE=arm64-linux-gnu- \
+            2>&1 | tee out/build.log
+            find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+            if [[ "${{ matrix.kernel }}" == 'aosp' ]]; then
             cp out/arch/arm64/boot/Image ../Image
             mv out/arch/arm64/boot/dtbo.img ../stock-dtbo.img
             mv out/arch/arm64/boot/dtb ../dtb
