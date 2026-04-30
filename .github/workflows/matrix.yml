@@ -129,7 +129,8 @@ jobs:
             HOSTAR=llvm-ar \
             HOSTLD=ld.lld \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            alioth_defconfig
+            alioth_defconfig \
+            vendor/xiaomi/raikiri.config
 
           echo "Starting compilation..."
           make -j$(nproc --all) O=out LLVM=1 \
