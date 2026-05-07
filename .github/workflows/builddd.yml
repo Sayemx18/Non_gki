@@ -86,9 +86,6 @@ jobs:
           export CCACHE_EXEC=/usr/bin/ccache
           cd Redlines
           echo "Generating defconfig..."
-          cat arch/arm64/configs/vendor/kona-perf_defconfig \
-          arch/arm64/configs/vendor/xiaomi/alioth.config \
-          > arch/arm64/configs/vendor/alioth_defconfig
           make O=out LLVM=1 ARCH=arm64 \
             CC=clang \
             LD=ld.lld \
@@ -104,7 +101,8 @@ jobs:
             HOSTAR=llvm-ar \
             HOSTLD=ld.lld \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            alioth_defconfig
+            vendor/kona-perf_defconfig \
+            vendor/xiaomi/alioth.config
           echo "Starting compilation..."
           make -j$(nproc --all) O=out LLVM=1 \
             ARCH=arm64 \
