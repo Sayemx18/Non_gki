@@ -72,7 +72,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.BRANCH }} Redlines
+          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.BRANCH }} Redlines
         
       - name: Build Kernel
         run: |
@@ -85,27 +85,47 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd Redlines
-          make O=out alioth_defconfig \
-          vendor/xiaomi/raikiri.config 
-          grep THERMAL_DIMMING out/.config
-          grep FAKE_UNAME_5_15=y out/.config
-          grep KSU out/.config
-          grep THINLTO out/.config
-          grep UCLAMP_TASK out/.config
-          grep CONFIG_PELT_UTIL_HALFLIFE_16 out/.config
-          make O=out \
-            ARCH=arm64 \
-            SUBARCH=arm64 \
-            LLVM=1 \
-            LLVM_IAS=1 \
-            CC="ccache clang" \
+          echo "Generating defconfig..."
+          make O=out LLVM=1 ARCH=arm64 \
+            CC=clang \
+            LD=ld.lld \
+            AR=llvm-ar \
+            AS=llvm-as \
+            NM=llvm-nm \
+            STRIP=llvm-strip \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            READELF=llvm-readelf \
             HOSTCC=clang \
             HOSTCXX=clang++ \
+            HOSTAR=llvm-ar \
+            HOSTLD=ld.lld \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
-            -j$(nproc --all) \
-            2>&1 | tee out/build.log
+            vendor/kona-perf_defconfig
+            
+          scripts/kconfig/merge_config.sh -m \
+            out/.config \
+            vendor/xiaomi/alioth.config
+            
+          make O=out LLVM=1 ARCH=arm64 olddefconfig
+          
+          echo "Starting compilation..."
+          make -j$(nproc --all) O=out LLVM=1 \
+            ARCH=arm64 \
+            CC=clang \
+            LD=ld.lld \
+            AR=llvm-ar \
+            AS=llvm-as \
+            NM=llvm-nm \
+            STRIP=llvm-strip \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            READELF=llvm-readelf \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
+            HOSTAR=llvm-ar \
+            HOSTLD=ld.lld \
+            CROSS_COMPILE=aarch64-linux-gnu-
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
 
       - name: Upload Images
