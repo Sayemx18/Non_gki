@@ -82,7 +82,7 @@ jobs:
 
       -  name: Clone Repo
          run: |
-          git clone --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
+          git clone ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
         
       - name: 5k Dtbo
         if: matrix.kernel == 'aosp5k' || matrix.kernel == 'miui5k'
@@ -113,6 +113,7 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_EXEC=/usr/bin/ccache
           cd k_tree
+          curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
           echo "Generating defconfig..."
           make O=out LLVM=1 ARCH=arm64 \
             CC=clang \
