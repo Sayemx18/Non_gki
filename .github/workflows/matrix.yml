@@ -82,7 +82,7 @@ jobs:
 
       -  name: Clone Repo
          run: |
-          git clone ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
+          git clone --recurse-submodules ${{ github.event.inputs.KERNEL_TREE }} -b base k_tree
         
       - name: 5k Dtbo
         if: matrix.kernel == 'aosp5k' || matrix.kernel == 'miui5k'
