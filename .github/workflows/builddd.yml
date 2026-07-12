@@ -72,7 +72,7 @@ jobs:
 
       - name: Clone Repo
         run: |
-          git clone --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.BRANCH }} Redlines
+          git clone --recurse-submodules --depth=1 ${{ github.event.inputs.KERNEL_TREE }} -b ${{ github.event.inputs.BRANCH }} Redlines
         
       - name: Build Kernel
         run: |
@@ -101,8 +101,9 @@ jobs:
             HOSTAR=llvm-ar \
             HOSTLD=ld.lld \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            vendor/kona-perf_defconfig \
-            vendor/xiaomi/alioth.config
+            alioth_defconfig \
+            vendor/xiaomi/raikiri.config
+            
           echo "Starting compilation..."
           make -j$(nproc --all) O=out LLVM=1 \
             ARCH=arm64 \
