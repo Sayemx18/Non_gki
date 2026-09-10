@@ -91,7 +91,7 @@ jobs:
           git config --global user.email "sayemxx18@gmail.com"
           git config --global user.name "sayem"
           git fetch origin
-          git cherry-pick 1cdb6ca2c3ef5de1d2e3b0955dea40add27c2749
+          git cherry-pick d286aad367cbafe327435e1548ecde40332d9d99
 
       - name: Display Dimensions miui
         if:  matrix.kernel == 'miui' || matrix.kernel == 'miui5k'
@@ -100,7 +100,7 @@ jobs:
           git config --global user.email "sayemxx18@gmail.com"
           git config --global user.name "sayem"
           git fetch origin
-          git cherry-pick 9ac342697735c35d9e0ab47bc34a68a3e0094312
+          git cherry-pick be7b91b92923337030f56919130e384ddc1f1c10
                               
       - name: Build Kernel
         run: |
