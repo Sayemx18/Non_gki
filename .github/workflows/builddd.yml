@@ -147,7 +147,7 @@ jobs:
       - name: Define ZIP Name
         run: |
           COMPILED_DATE=$(date +%Y%m%d)
-          echo "ZIP_NAME=Raikiri-v1.2-test-alioth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
+          echo "ZIP_NAME=Raikiri-test-alioth(KSU)-${COMPILED_DATE}" >> $GITHUB_ENV
           
       - name: Create Flashable Kernel Zip
         run: |
