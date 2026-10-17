@@ -120,7 +120,8 @@ jobs:
             HOSTCXX=clang++ \
             HOSTAR=llvm-ar \
             HOSTLD=ld.lld \
-            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LDFLAGS_vmlinux="--error-limit=0" 2>&1 | tee build.log
           find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
 
       - name: Upload Images
