@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Install Dependencies
-        run: sudo apt install flex libncurses6 libxml2
+        run: sudo apt install flex libncurses6 libxml2-16
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
