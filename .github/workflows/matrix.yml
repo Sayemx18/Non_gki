@@ -56,29 +56,40 @@ jobs:
       - name: Download & Extract Clang
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
-          if [[ "${{ github.event.inputs.COMPILER }}" == "aosp" ]]; then
-            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -O clang.tar.gz
-            mkdir toolchain
-            tar -xf clang.tar.gz -C toolchain
-          elif [[ "${{ github.event.inputs.COMPILER }}" == "aosp-21" ]]; then
-            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/ebcc6c3bef363bc539ea39f45b6abae1dce6ff1a/clang-r574158.tar.gz -O clang.tar.gz
-            mkdir toolchain
-            tar -xf clang.tar.gz -C toolchain
-          elif [[ "${{ github.event.inputs.COMPILER }}" == "neutron" ]]; then
-            wget https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst -O clang.tar.zst
-            mkdir toolchain
-            unzstd -d clang.tar.zst
-            tar -xf clang.tar -C toolchain
-          elif [[ "${{ github.event.inputs.COMPILER }}" == "aosp-22" ]]; then
-            wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r584948.tar.gz
-            mkdir toolchain
-            tar -xf clang.tar.gz -C toolchain
-          else 
-             wget https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz -O clang.tar.zst
-             mkdir toolchain
-             unzstd -d clang.tar.zst
-             tar -xf clang.tar -C toolchain
-          fi     
+          set -euo pipefail
+          compiler='${{ github.event.inputs.COMPILER }}'
+          archive=clang.tar.gz
+
+          case "$compiler" in
+            aosp)
+              url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz'
+              ;;
+            aosp-21)
+              url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/ebcc6c3bef363bc539ea39f45b6abae1dce6ff1a/clang-r574158.tar.gz'
+              ;;
+            neutron)
+              url='https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/10032024/neutron-clang-10032024.tar.zst'
+              archive=clang.tar.zst
+              ;;
+            aosp-22)
+              url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r584948.tar.gz'
+              ;;
+            zyc|'')
+              url='https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz'
+              ;;
+            *)
+              echo "Unsupported compiler: $compiler" >&2
+              exit 1
+              ;;
+          esac
+
+          curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 "$url" -o "$archive"
+          mkdir -p toolchain
+          if [[ "$archive" == *.zst ]]; then
+            tar --use-compress-program=unzstd -xf "$archive" -C toolchain
+          else
+            tar -xzf "$archive" -C toolchain
+          fi
 
       -  name: Clone Repo
          run: |
